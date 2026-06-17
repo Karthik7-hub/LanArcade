@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UNO</title>
+    <style>
+        :root {
+            --red: #ef4444; --blue: #3b82f6; --green: #10b981; --yellow: #f59e0b; --black: #18181b;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #020617; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; touch-action: manipulation; }
+
+        #game-container { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
+
+        /* Virtual Table */
+        .table { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .center-pile { position: relative; display: flex; align-items: center; justify-content: center; gap: 16px; }
+
+        /* AAA Card Design */
+        .card {
+            width: 70px; height: 105px; border-radius: 10px; border: 3px solid rgba(255,255,255,0.8);
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            font-size: 20px; font-weight: 900; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4); user-select: none; -webkit-user-select: none;
+            padding: 4px;
+        }
+        .card.Red { background: var(--red); } .card.Blue { background: var(--blue); }
+        .card.Green { background: var(--green); } .card.Yellow { background: var(--yellow); }
+        .card.Wild { background: var(--black); border-color: rgba(255,255,255,0.4); }
+
+        .card .value-main { font-size: 36px; font-style: italic; transform: skewX(-8deg); }
+        .card .value-small { width: 100%; padding: 2px 4px; font-size: 12px; }
+
+        /* Opponents */
+        .opponents-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px;
+            flex-wrap: wrap;
+        }
+        .opponent { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .opponent .avatar {
+            width: 44px; height: 44px; background: #334155; border-radius: 50%;
+            border: 3px solid transparent; display: flex; align-items: center;
+            justify-content: center; font-weight: bold; font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .opponent.active .avatar {
+            border-color: #fbce03; box-shadow: 0 0 16px rgba(251,206,3,0.5);
+        }
+        .opponent .name { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94a3b8; }
+        .opponent .count { font-size: 11px; font-weight: 600; color: #64748b; }
+
+        /* Player Hand */
+        .player-hand {
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding: 8px 8px 16px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            min-height: 140px;
+        }
+        .player-hand::-webkit-scrollbar { display: none; }
+        
+        .hand-card {
+            position: relative;
+            margin-left: -20px;
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hand-card:first-child { margin-left: 0; }
+
+        /* Touch: use active state instead of hover */
+        @media (hover: hover) {
+            .hand-card:hover { transform: translateY(-24px) scale(1.08); z-index: 100 !important; }
+        }
+        @media (hover: none) {
+            .hand-card:active { transform: translateY(-24px) scale(1.08); z-index: 100 !important; }
+        }
+
+        /* Turn indicator */
+        .turn-indicator {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #fbce03, transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .my-turn .turn-indicator { opacity: 1; }
+
+        /* Controls */
+        .draw-pile {
+            width: 70px; height: 105px; background: #1e293b; border: 3px solid #475569;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-style: italic; color: #6366f1; cursor: pointer;
+            font-size: 16px; letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .draw-pile:active { transform: scale(0.95); background: #334155; }
+
+        /* Color Picker */
+        #color-picker {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.92);
+            display: none; grid-template-columns: 1fr 1fr; gap: 16px;
+            padding: 40px; place-items: center; z-index: 1000;
+            align-content: center;
+        }
+        #color-picker h3 {
+            grid-column: 1 / -1;
+            font-size: 18px;
+            font-weight: 800;
+            text-align: center;
+            color: #94a3b8;
+            letter-spacing: 2px;
+        }
+        .color-btn {
+            width: 80px; height: 80px; border-radius: 20px;
+            border: 4px solid rgba(255,255,255,0.3); cursor: pointer;
+            transition: transform 0.15s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .color-btn:active { transform: scale(0.9); }
+        .color-btn.Red { background: var(--red); } .color-btn.Blue { background: var(--blue); }
+        .color-btn.Green { background: var(--green); } .color-btn.Yellow { background: var(--yellow); }
+
+        /* Status bar */
+        .status-bar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            justify-content: center;
+            padding: 8px;
+            z-index: 10;
+        }
+        .status-badge {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #94a3b8;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .status-badge.active { color: #fbbf24; border-color: rgba(251,191,36,0.3); }
+
+        /* Winner overlay */
+        #winner-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 500;
+        }
+        #winner-overlay h2 { font-size: 32px; }
+        #winner-overlay p { color: #94a3b8; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="status-bar">
+            <div class="status-badge" id="turn-status">WAITING...</div>
+        </div>
+
+        <div class="opponents-row" id="opponents-layer"></div>
+        
+        <div class="table" id="table">
+            <div class="center-pile">
+                <div id="draw-pile" class="draw-pile" ontouchstart="draw()" onclick="draw()">UNO</div>
+                <div id="discard-anchor" style="position: relative; width: 70px; height: 105px;"></div>
+            </div>
+        </div>
+
+        <div class="player-hand" id="player-hand"></div>
+        <div class="turn-indicator" id="turn-indicator"></div>
+    </div>
+
+    <div id="color-picker">
+        <h3>CHOOSE COLOR</h3>
+        <div class="color-btn Red" ontouchstart="chooseColor('Red')" onclick="chooseColor('Red')"></div>
+        <div class="color-btn Blue" ontouchstart="chooseColor('Blue')" onclick="chooseColor('Blue')"></div>
+        <div class="color-btn Green" ontouchstart="chooseColor('Green')" onclick="chooseColor('Green')"></div>
+        <div class="color-btn Yellow" ontouchstart="chooseColor('Yellow')" onclick="chooseColor('Yellow')"></div>
+    </div>
+
+    <div id="winner-overlay">
+        <h2>🎉</h2>
+        <h2 id="winner-name"></h2>
+        <p>wins the game!</p>
+    </div>
+
+    <script>
+        const Arcade = window.parent.Arcade;
+        let pendingCardIdx = null;
+
+        function createCardUI(card) {
+            const el = document.createElement('div');
+            el.className = `card ${card.color}`;
+            
+            let displayValue = card.value;
+            if (card.value === 'DrawTwo') displayValue = '+2';
+            else if (card.value === 'WildDrawFour') displayValue = '+4';
+            else if (card.value === 'Skip') displayValue = '⊘';
+            else if (card.value === 'Reverse') displayValue = '⟲';
+            else if (card.value === 'Wild') displayValue = '★';
+            else displayValue = card.value;
+
+            el.innerHTML = `
+                <div class="value-small">${displayValue}</div>
+                <div class="value-main">${displayValue}</div>
+                <div class="value-small" style="transform: rotate(180deg)">${displayValue}</div>
+            `;
+            return el;
+        }
+
+        function updateUI() {
+            const publicState = Arcade.getPublicState();
+            const privateState = Arcade.getPrivateState();
+            const player = Arcade.getPlayer();
+            const room = Arcade.getRoom();
+
+            if (!publicState || !room) return;
+
+            // Winner check
+            if (publicState.status === 'finished' && publicState.winner) {
+                const winnerName = room.players.find(p => p.id === publicState.winner)?.name || 'Unknown';
+                document.getElementById('winner-name').textContent = winnerName.toUpperCase();
+                document.getElementById('winner-overlay').style.display = 'flex';
+                return;
+            }
+
+            // 1. Update Opponents
+            const oppLayer = document.getElementById('opponents-layer');
+            oppLayer.innerHTML = '';
+            const others = room.players.filter(p => p.id !== player.id);
+            const cardCounts = publicState.playerCardCounts || {};
+            others.forEach((opp) => {
+                const div = document.createElement('div');
+                div.className = `opponent ${publicState.currentPlayerId === opp.id ? 'active' : ''}`;
+                div.innerHTML = `
+                    <div class="avatar">${opp.name[0]}</div>
+                    <div class="name">${opp.name}</div>
+                    <div class="count">🎴 ${cardCounts[opp.id] || 0}</div>
+                `;
+                oppLayer.appendChild(div);
+            });
+
+            // 2. Update Discard Pile
+            const anchor = document.getElementById('discard-anchor');
+            anchor.innerHTML = '';
+            if (publicState.topCard) {
+                const topCard = createCardUI(publicState.topCard);
+                anchor.appendChild(topCard);
+            }
+
+            // 3. Update Hand
+            const handEl = document.getElementById('player-hand');
+            handEl.innerHTML = '';
+            if (privateState && privateState.hand) {
+                privateState.hand.forEach((card, i) => {
+                    const cardBtn = document.createElement('div');
+                    cardBtn.className = 'hand-card';
+                    cardBtn.style.zIndex = String(i);
+                    const ui = createCardUI(card);
+                    
+                    // Use both click and touchstart for responsiveness
+                    const handler = (e) => {
+                        e.preventDefault();
+                        playCard(i);
+                    };
+                    ui.addEventListener('click', handler);
+                    ui.addEventListener('touchend', handler, { passive: false });
+                    
+                    cardBtn.appendChild(ui);
+                    handEl.appendChild(cardBtn);
+                });
+            }
+
+            // 4. Update Turn Status
+            const isMyTurn = publicState.currentPlayerId === player.id;
+            const statusEl = document.getElementById('turn-status');
+            if (isMyTurn) {
+                statusEl.textContent = 'YOUR TURN';
+                statusEl.classList.add('active');
+                document.getElementById('game-container').classList.add('my-turn');
+            } else {
+                const currentPlayer = room.players.find(p => p.id === publicState.currentPlayerId);
+                statusEl.textContent = (currentPlayer?.name || '?').toUpperCase() + "'S TURN";
+                statusEl.classList.remove('active');
+                document.getElementById('game-container').classList.remove('my-turn');
+            }
+
+            // Direction indicator
+            if (publicState.drawPending > 0) {
+                statusEl.textContent += ` (+${publicState.drawPending} STACKED)`;
+            }
+        }
+
+        function playCard(idx) {
+            const privateState = Arcade.getPrivateState();
+            if (!privateState || !privateState.hand) return;
+            const card = privateState.hand[idx];
+            if (card.color === 'Wild') {
+                pendingCardIdx = idx;
+                document.getElementById('color-picker').style.display = 'grid';
+            } else {
+                Arcade.sendAction('PLAY_CARD', { cardIndex: idx });
+            }
+        }
+
+        function chooseColor(color) {
+            Arcade.sendAction('PLAY_CARD', { cardIndex: pendingCardIdx, chosenColor: color });
+            document.getElementById('color-picker').style.display = 'none';
+            pendingCardIdx = null;
+        }
+
+        function draw() {
+            Arcade.sendAction('DRAW_CARD', {});
+        }
+
+        Arcade.onUpdate(updateUI);
+        updateUI();
+    </script>
+</body>
+</html>

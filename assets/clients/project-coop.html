@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Project Coop</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #0f172a; color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; touch-action: none; }
+        #game-canvas { width: 100%; height: 100%; display: block; }
+        #ui-layer { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        .stat-badge { background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 14px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); }
+
+        /* Touch Controls */
+        #touch-controls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .touch-visible #touch-controls { display: flex; justify-content: space-between; align-items: flex-end; }
+        
+        .dpad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px;
+            gap: 4px;
+            pointer-events: auto;
+        }
+        .dpad-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            backdrop-filter: blur(4px);
+        }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: rgba(99,102,241,0.4);
+            border-color: rgba(99,102,241,0.6);
+        }
+        .dpad-spacer { visibility: hidden; }
+
+        .jump-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(99,102,241,0.2);
+            border: 3px solid rgba(99,102,241,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 900;
+            color: #a5b4fc;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            pointer-events: auto;
+        }
+        .jump-btn:active, .jump-btn.pressed {
+            background: rgba(99,102,241,0.5);
+            border-color: rgba(99,102,241,0.8);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="stat-badge" id="level-indicator">LEVEL 1</div>
+    </div>
+
+    <!-- Touch Controls (hidden on desktop) -->
+    <div id="touch-controls">
+        <div class="dpad">
+            <div class="dpad-spacer"></div>
+            <div class="dpad-spacer"></div>
+            <div class="dpad-spacer"></div>
+            <div class="dpad-btn" id="btn-left" data-key="left">◀</div>
+            <div class="dpad-spacer"></div>
+            <div class="dpad-btn" id="btn-right" data-key="right">▶</div>
+        </div>
+        <div class="jump-btn" id="btn-jump" data-key="jump">▲</div>
+    </div>
+
+    <script>
+        const Arcade = window.parent.Arcade;
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let snapshot = null;
+        let player = null;
+        let keys = { left: false, right: false, jump: false };
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        function init() {
+            window.addEventListener('resize', resize);
+            resize();
+
+            // Keyboard controls
+            window.addEventListener('keydown', (e) => handleKey(e.code, true));
+            window.addEventListener('keyup', (e) => handleKey(e.code, false));
+
+            // Touch controls
+            if (isTouchDevice) {
+                document.body.classList.add('touch-visible');
+                setupTouchControls();
+            }
+
+            // Gamepad support
+            requestAnimationFrame(pollGamepad);
+
+            // Input sending loop (60Hz)
+            setInterval(() => {
+                if (!player) return;
+                Arcade.sendAction('INPUT', {
+                    left: keys.left,
+                    right: keys.right,
+                    jump: keys.jump
+                });
+            }, 1000 / 60);
+
+            // Render loop
+            requestAnimationFrame(render);
+
+            Arcade.onUpdate(() => {
+                snapshot = Arcade.getPublicState();
+                player = Arcade.getPlayer();
+                if (snapshot) {
+                    document.getElementById('level-indicator').innerText = 'LEVEL ' + snapshot.levelId;
+                }
+            });
+        }
+
+        function setupTouchControls() {
+            const touchHandler = (e) => {
+                e.preventDefault();
+                const btn = e.currentTarget;
+                const key = btn.dataset.key;
+                if (e.type === 'touchstart' || e.type === 'mousedown') {
+                    keys[key] = true;
+                    btn.classList.add('pressed');
+                } else {
+                    keys[key] = false;
+                    btn.classList.remove('pressed');
+                }
+            };
+
+            ['btn-left', 'btn-right', 'btn-jump'].forEach(id => {
+                const el = document.getElementById(id);
+                el.addEventListener('touchstart', touchHandler, { passive: false });
+                el.addEventListener('touchend', touchHandler, { passive: false });
+                el.addEventListener('touchcancel', touchHandler, { passive: false });
+                el.addEventListener('mousedown', touchHandler);
+                el.addEventListener('mouseup', touchHandler);
+            });
+        }
+
+        function pollGamepad() {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            for (const gp of gamepads) {
+                if (!gp) continue;
+                // Standard mapping: left stick or d-pad
+                keys.left = gp.axes[0] < -0.3 || gp.buttons[14]?.pressed;
+                keys.right = gp.axes[0] > 0.3 || gp.buttons[15]?.pressed;
+                keys.jump = gp.buttons[0]?.pressed || gp.buttons[12]?.pressed;
+            }
+            requestAnimationFrame(pollGamepad);
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function handleKey(code, isDown) {
+            if (code === 'ArrowLeft' || code === 'KeyA') keys.left = isDown;
+            if (code === 'ArrowRight' || code === 'KeyD') keys.right = isDown;
+            if (code === 'Space' || code === 'ArrowUp' || code === 'KeyW') keys.jump = isDown;
+        }
+
+        function render() {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (snapshot && snapshot.camera && snapshot.entities && snapshot.players) {
+                const cam = snapshot.camera;
+                ctx.save();
+
+                // Center camera
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(cam.zoom, cam.zoom);
+                ctx.translate(-cam.x, -cam.y);
+
+                // Draw entities
+                snapshot.entities.forEach(e => {
+                    if (e.type === 'platform') {
+                        ctx.fillStyle = '#334155';
+                        ctx.fillRect(e.x, e.y, e.w, e.h);
+                    } else if (e.type === 'block') {
+                        ctx.fillStyle = '#fbbf24';
+                        ctx.fillRect(e.x, e.y, e.w, e.h);
+                        // Weight indicator
+                        ctx.fillStyle = '#92400e';
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('×' + e.mass, e.x + e.w/2, e.y + e.h/2 + 4);
+                    } else if (e.type === 'key') {
+                        if (e.active) {
+                            ctx.fillStyle = '#fde047';
+                            ctx.beginPath();
+                            ctx.arc(e.x + 16, e.y + 16, 10, 0, Math.PI * 2);
+                            ctx.fill();
+                            // Glow
+                            ctx.shadowColor = '#fde047';
+                            ctx.shadowBlur = 15;
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+                        }
+                    } else if (e.type === 'door') {
+                        ctx.fillStyle = e.locked ? '#ef4444' : '#10b981';
+                        ctx.fillRect(e.x, e.y, e.w, e.h);
+                        // Door icon
+                        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                        ctx.fillRect(e.x + e.w * 0.6, e.y + e.h * 0.4, 6, 6);
+                    }
+                });
+
+                // Draw Players
+                for (let id in snapshot.players) {
+                    const p = snapshot.players[id];
+
+                    // Shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.fillRect(p.x + 2, p.y + 30, 28, 4);
+
+                    // Body
+                    ctx.fillStyle = p.isDead ? '#475569' : p.color;
+                    ctx.beginPath();
+                    drawRoundedRect(ctx, p.x, p.y, 32, 32, 8);
+                    ctx.fill();
+
+                    // Eyes
+                    if (!p.isDead) {
+                        ctx.fillStyle = '#fff';
+                        const eyeX = p.facing === 1 ? p.x + 18 : p.x + 6;
+                        ctx.fillRect(eyeX, p.y + 8, 4, 8);
+                        ctx.fillRect(eyeX + 6, p.y + 8, 4, 8);
+                    } else {
+                        // X eyes for dead
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        const cx = p.x + 16;
+                        const cy = p.y + 14;
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 6, cy - 4); ctx.lineTo(cx - 2, cy + 4);
+                        ctx.moveTo(cx - 2, cy - 4); ctx.lineTo(cx - 6, cy + 4);
+                        ctx.moveTo(cx + 2, cy - 4); ctx.lineTo(cx + 6, cy + 4);
+                        ctx.moveTo(cx + 2, cy - 4); ctx.lineTo(cx + 6, cy + 4);
+                        ctx.stroke();
+                    }
+
+                    // Name
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(p.name.toUpperCase(), p.x + 16, p.y - 8);
+
+                    // Indicator for self
+                    if (player && id === player.id) {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeRect(p.x - 4, p.y - 4, 40, 40);
+                        ctx.setLineDash([]);
+                    }
+                }
+
+                ctx.restore();
+
+                // HUD
+                if (snapshot.deaths > 0) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(canvas.width - 140, 16, 120, 36);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('💀 ' + snapshot.deaths + ' deaths', canvas.width - 30, 40);
+                }
+
+                if (snapshot.status === 'win') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#10b981';
+                    ctx.font = 'bold 48px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🎉 ALL LEVELS COMPLETE!', canvas.width / 2, canvas.height / 2);
+                }
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        function drawRoundedRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "id": "uno",
+  "name": "UNO",
+  "version": "1.0.0",
+  "sdkVersion": "1.0.0",
+  "author": "Lan Arcade Team",
+  "description": "The classic card game of matching colors and numbers.",
+  "minPlayers": 2,
+  "maxPlayers": 8,
+  "permissions": ["private-state", "timers", "persistent-storage"],
+  "entry": "index.html",
+  "thumbnail": "thumbnail.png"
+}

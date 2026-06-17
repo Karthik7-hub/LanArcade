@@ -1,0 +1,19 @@
+{
+  "id": "project-coop",
+  "name": "Project Coop",
+  "version": "1.0.0",
+  "sdkVersion": "1.0.0",
+  "author": "LAN Arcade",
+  "description": "A cooperative puzzle platformer where teamwork is the only way to win.",
+  "entry": "index.html",
+  "minPlayers": 2,
+  "maxPlayers": 8,
+  "supportsReconnect": true,
+  "supportsBots": false,
+  "permissions": [
+    "timers",
+    "private-state",
+    "persistent-storage"
+  ],
+  "thumbnail": "thumbnail.png"
+}
