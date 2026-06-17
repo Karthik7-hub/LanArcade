@@ -78,7 +78,7 @@ class JsEngine {
           var msg = args.map(function(arg) {
             return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
           }).join(' ');
-          sendMessage('consoleLog', msg);
+          sendMessage('consoleLog', JSON.stringify(msg));
         }
       };
     ''');
