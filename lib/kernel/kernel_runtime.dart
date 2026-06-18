@@ -110,6 +110,12 @@ class KernelRuntime {
         contentType = 'image/png';
       } else if (filePath.endsWith('.json')) {
         contentType = 'application/json';
+      } else if (filePath.endsWith('.wav')) {
+        contentType = 'audio/wav';
+      } else if (filePath.endsWith('.mp3')) {
+        contentType = 'audio/mpeg';
+      } else if (filePath.endsWith('.ogg')) {
+        contentType = 'audio/ogg';
       }
       return Response.ok(bytes, headers: {'content-type': contentType});
     });
@@ -385,6 +391,9 @@ class KernelRuntime {
           await roomService.updateSettings(roomId, settings);
           connectionManager.broadcastToRoom(
               roomId, 'room.update', updatedRoom.toJson());
+
+          final engine = activeEngines[roomId];
+          engine?.settingsUpdated(settings);
         }
         break;
 

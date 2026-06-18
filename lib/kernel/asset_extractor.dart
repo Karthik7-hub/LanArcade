@@ -56,6 +56,22 @@ class AssetExtractor {
       final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       await file.writeAsBytes(bytes, flush: true);
       _log.info('Extracted client assets for $gameId to ${file.path}');
+
+      // Extract sub-assets starting with "assets/clients/sfx/${gameId}_" recursively
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      final assets = manifest.listAssets();
+      final prefix = 'assets/clients/sfx/${gameId}_';
+      final subAssets = assets.where((key) => key.startsWith(prefix)).toList();
+
+      for (final assetKey in subAssets) {
+        final relativePath = assetKey.replaceFirst(prefix, '');
+        final targetFile = File(p.join(targetDir.path, relativePath));
+        await targetFile.parent.create(recursive: true);
+        final fileData = await rootBundle.load(assetKey);
+        final fileBytes = fileData.buffer.asUint8List(fileData.offsetInBytes, fileData.lengthInBytes);
+        await targetFile.writeAsBytes(fileBytes, flush: true);
+        _log.info('Extracted sub-asset for $gameId: $relativePath to ${targetFile.path}');
+      }
     } catch (e) {
       _log.severe('Failed to extract client assets for $gameId: $e');
     }

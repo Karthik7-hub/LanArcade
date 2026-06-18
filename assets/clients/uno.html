@@ -1042,6 +1042,47 @@
             }
         }
 
+        // --- SOUND EFFECTS SYSTEM ---
+        let lastState = {
+            status: null,
+            round: null,
+            topCard: null,
+            currentPlayerId: null,
+            direction: null,
+            cardCounts: {}
+        };
+
+        const sfx = {
+            start: new Audio('start.wav'),
+            play: new Audio('play.wav'),
+            draw: new Audio('draw.wav'),
+            penalty: new Audio('penalty.wav'),
+            skip: new Audio('skip.wav'),
+            reverse: new Audio('reverse.wav'),
+            swap: new Audio('swap.wav'),
+            turn: new Audio('turn.wav'),
+            win: new Audio('win.wav')
+        };
+
+        // Preload sound files
+        Object.keys(sfx).forEach(key => {
+            sfx[key].volume = 0.8;
+            sfx[key].load();
+        });
+
+        function playSound(name) {
+            try {
+                const key = name.replace('.wav', '');
+                const audio = sfx[key];
+                if (audio) {
+                    audio.currentTime = 0; // Rewind to start to handle quick successive actions
+                    audio.play().catch(e => console.warn("Audio playback blocked or failed:", e));
+                }
+            } catch(e) {
+                console.warn("Could not play sound:", e);
+            }
+        }
+
         // --- UPDATE LAYOUT & RENDER HANDS ---
         function updateUI() {
             if (!Arcade) return;
@@ -1051,6 +1092,79 @@
             const room = Arcade.getRoom();
 
             if (!publicState || !room) return;
+
+            // Gather card counts for transition tracking
+            const cardCounts = publicState.playerCardCounts || {};
+
+            // Check transitions for sound effects
+            if (lastState.status !== null) {
+                // 1. Game Start / New Round
+                if (publicState.status === 'active' && (lastState.status !== 'active' || publicState.round !== lastState.round)) {
+                    playSound('start.wav');
+                }
+                
+                // 2. Play Card
+                else if (lastState.topCard && publicState.topCard && 
+                    (lastState.topCard.value !== publicState.topCard.value || lastState.topCard.color !== publicState.topCard.color)) {
+                    
+                    const cardVal = publicState.topCard.value;
+                    if (cardVal === 'DrawTwo' || cardVal === 'WildDrawFour') {
+                        playSound('penalty.wav');
+                    } else if (cardVal === 'Skip') {
+                        playSound('skip.wav');
+                    } else if (cardVal === 'Reverse') {
+                        playSound('reverse.wav');
+                    } else if ((cardVal === '0' || cardVal === '7') && publicState.settings && publicState.settings.sevenZero) {
+                        playSound('swap.wav');
+                    } else {
+                        playSound('play.wav');
+                    }
+                }
+                
+                // 3. Draw Card
+                else {
+                    let cardDrawn = false;
+                    for (let pid in cardCounts) {
+                        const prevCount = lastState.cardCounts[pid] || 0;
+                        const newCount = cardCounts[pid] || 0;
+                        if (newCount > prevCount && prevCount > 0) {
+                            cardDrawn = true;
+                            break;
+                        }
+                    }
+                    if (cardDrawn && lastState.status === 'active' && publicState.status === 'active') {
+                        playSound('draw.wav');
+                    }
+                }
+
+                // 4. Turn Start Alert
+                const isMyTurn = publicState.currentPlayerId === player.id;
+                const wasMyTurn = lastState.currentPlayerId === player.id;
+                if (isMyTurn && !wasMyTurn && publicState.status === 'active') {
+                    playSound('turn.wav');
+                }
+
+                // 5. Victory / Match Completion
+                if (publicState.status === 'finished' && lastState.status !== 'finished') {
+                    playSound('win.wav');
+                }
+            } else {
+                // First render sound trigger
+                if (publicState.status === 'active') {
+                    playSound('start.wav');
+                    if (publicState.currentPlayerId === player.id) {
+                        playSound('turn.wav');
+                    }
+                }
+            }
+
+            // Save state for next update
+            lastState.status = publicState.status;
+            lastState.round = publicState.round;
+            lastState.topCard = publicState.topCard ? { ...publicState.topCard } : null;
+            lastState.currentPlayerId = publicState.currentPlayerId;
+            lastState.direction = publicState.direction;
+            lastState.cardCounts = { ...cardCounts };
 
             // 1. Winner Check
             const finishedPlayers = publicState.finishedPlayers || [];
@@ -1106,7 +1220,6 @@
             const isMyTurn = publicState.currentPlayerId === player.id;
 
             // 5. Render Opponents
-            const cardCounts = publicState.playerCardCounts || {};
             const others = room.players.filter(p => p.id !== player.id);
             const total = others.length;
             const scale = total > 7 ? 'transform: translate(-50%, -50%) scale(0.75)' : total > 4 ? 'transform: translate(-50%, -50%) scale(0.9)' : 'transform: translate(-50%, -50%)';

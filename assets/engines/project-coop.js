@@ -53,6 +53,21 @@ const engine = {
         console.log("Project Coop Engine loaded successfully.");
     },
 
+    onPlayerLeave: function(player) {
+        console.log("onPlayerLeave called for player: " + player.id);
+        if (this.state.players[player.id]) {
+            delete this.state.players[player.id];
+        }
+        
+        // Check if there are no players left
+        const activeCount = Object.keys(this.state.players).length;
+        if (activeCount === 0) {
+            this.state.status = 'finished';
+        }
+        
+        this.sync();
+    },
+
     onInit: function(settings, players) {
         console.log("Initializing Project Coop Engine with settings:", JSON.stringify(settings));
         this.state.settings = { ...this.state.settings, ...settings };

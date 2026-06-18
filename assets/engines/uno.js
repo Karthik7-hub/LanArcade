@@ -94,6 +94,64 @@ const engine = {
         this.sync();
     },
 
+    onPlayerLeave: function(player) {
+        console.log("onPlayerLeave called for player: " + player.id);
+        const index = this.state.playerIds.indexOf(player.id);
+        if (index === -1) return;
+
+        const wasCurrentPlayer = (index === this.state.currentPlayerIndex);
+        let nextPlayerId = null;
+        if (wasCurrentPlayer) {
+            nextPlayerId = this.getNextPlayerId();
+        }
+
+        // Return their hand cards back to the deck
+        const hand = this.state.hands[player.id];
+        if (hand && hand.length > 0) {
+            this.state.deck = hand.concat(this.state.deck);
+            delete this.state.hands[player.id];
+        }
+        
+        // Remove score, placements, finishedPlayers, etc.
+        delete this.state.scores[player.id];
+        if (this.state.unoDeclared) delete this.state.unoDeclared[player.id];
+        this.state.finishedPlayers = (this.state.finishedPlayers || []).filter(id => id !== player.id);
+
+        // Remove from playerIds
+        this.state.playerIds.splice(index, 1);
+
+        // Check if game is finished (less than 2 players left)
+        const activePlayers = this.state.playerIds.filter(id => !this.state.finishedPlayers.includes(id));
+        if (this.state.playerIds.length < 2 || activePlayers.length <= 1) {
+            this.state.status = 'finished';
+            if (activePlayers.length === 1) {
+                this.state.winner = activePlayers[0];
+            } else if (this.state.playerIds.length > 0) {
+                this.state.winner = this.state.playerIds[0];
+            } else {
+                this.state.winner = null;
+            }
+            this.sync();
+            return;
+        }
+
+        // Update currentPlayerIndex
+        if (wasCurrentPlayer && nextPlayerId) {
+            const newIdx = this.state.playerIds.indexOf(nextPlayerId);
+            this.state.currentPlayerIndex = newIdx !== -1 ? newIdx : 0;
+            this.resetTurnTimer();
+        } else {
+            if (index < this.state.currentPlayerIndex) {
+                this.state.currentPlayerIndex--;
+            }
+            if (this.state.currentPlayerIndex >= this.state.playerIds.length) {
+                this.state.currentPlayerIndex = 0;
+            }
+        }
+
+        this.sync();
+    },
+
     onAction: function(player, action) {
         console.log("Action received from player " + player.name + " (" + player.id + "):", JSON.stringify(action));
         if (this.state.status !== 'active') return;

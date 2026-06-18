@@ -245,6 +245,18 @@ class JsEngine {
     }
   }
 
+  void settingsUpdated(Map<String, dynamic> settings) {
+    final settingsJson = _escapeForJs(jsonEncode(settings));
+    final result = _runtime.evaluate("if (typeof engine.onSettingsUpdate === 'function') { engine.onSettingsUpdate(JSON.parse('$settingsJson')); } else { engine.state.settings = { ...engine.state.settings, ...JSON.parse('$settingsJson') }; }");
+    if (result.isError) {
+      _log.severe('JS Engine settingsUpdated error: ${result.stringResult}');
+    }
+    final syncRes = _runtime.evaluate("if (typeof engine.sync === 'function') engine.sync();");
+    if (syncRes.isError) {
+      _log.severe('JS Engine sync error after settings update: ${syncRes.stringResult}');
+    }
+  }
+
   void pause() {
     _tickTimer?.cancel();
     final result = _runtime.evaluate('engine.onPause()');
