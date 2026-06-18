@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [availableGames, setAvailableGames] = useState<GameManifest[]>([]);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [lobbyTab, setLobbyTab] = useState<'players' | 'leaderboard'>('players');
 
   useEffect(() => {
     // Initial identity check
@@ -198,7 +199,23 @@ const App: React.FC = () => {
           <header style={styles.waitingHeader}>
             <div style={styles.roomInfo}>
               <div style={styles.roomCode}>{room.code}</div>
-              <h2 style={styles.gameName}>{room.game.name}</h2>
+              {player.id === room.hostId ? (
+                <select
+                  value={room.game.id}
+                  onChange={(e) => {
+                    wsClient.send('room.change_game', { gameId: e.target.value });
+                  }}
+                  style={styles.gameSelectInput}
+                >
+                  {availableGames.map(g => (
+                    <option key={g.id} value={g.id}>
+                      {g.name.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <h2 style={styles.gameName}>{room.game.name}</h2>
+              )}
             </div>
             <button
               onClick={() => {
@@ -213,25 +230,97 @@ const App: React.FC = () => {
           </header>
 
           <div style={styles.card}>
-            <div style={styles.playerListHeader}>
-              <h3 style={styles.cardTitle}>PLAYERS IN LOBBY</h3>
-              <span style={styles.playerCount}>
-                {room.players.length} / {room.game.maxPlayers}
-              </span>
+            {/* Tab Toggle */}
+            <div style={{ display: 'flex', gap: 16, borderBottom: `1px solid ${colors.border}`, paddingBottom: 12, marginBottom: 12 }}>
+              <button
+                onClick={() => setLobbyTab('players')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: lobbyTab === 'players' ? colors.primary : colors.textMuted,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  borderBottom: lobbyTab === 'players' ? `2px solid ${colors.primary}` : 'none',
+                  paddingBottom: 4,
+                  outline: 'none',
+                }}
+              >
+                PLAYERS ({room.players.length})
+              </button>
+              <button
+                onClick={() => setLobbyTab('leaderboard')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: lobbyTab === 'leaderboard' ? colors.secondary : colors.textMuted,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  borderBottom: lobbyTab === 'leaderboard' ? `2px solid ${colors.secondary}` : 'none',
+                  paddingBottom: 4,
+                  outline: 'none',
+                }}
+              >
+                🏆 ROOM LEADERBOARD
+              </button>
             </div>
-            <ul style={styles.playerList}>
-              {room.players.map(p => (
-                <li key={p.id} style={styles.playerItem}>
-                  <div style={styles.playerAvatar}>
-                    {p.name[0].toUpperCase()}
-                  </div>
-                  <span style={styles.playerName}>{p.name}</span>
-                  {p.id === room.hostId && (
-                    <span style={styles.hostBadge}>HOST</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+
+            {lobbyTab === 'players' ? (
+              <>
+                <div style={styles.playerListHeader}>
+                  <h3 style={styles.cardTitle}>PLAYERS IN LOBBY</h3>
+                  <span style={styles.playerCount}>
+                    {room.players.length} / {room.game.maxPlayers}
+                  </span>
+                </div>
+                <ul style={styles.playerList}>
+                  {room.players.map(p => (
+                    <li key={p.id} style={styles.playerItem}>
+                      <div style={styles.playerAvatar}>
+                        {p.name[0].toUpperCase()}
+                      </div>
+                      <span style={styles.playerName}>{p.name}</span>
+                      {p.id === room.hostId && (
+                        <span style={styles.hostBadge}>HOST</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(() => {
+                  const leaderboardData = room.settings?._leaderboard || {};
+                  const sortedEntries = Object.entries(leaderboardData)
+                    .map(([id, data]: [string, any]) => ({
+                      id,
+                      name: typeof data === 'object' ? data.name : `Player ${id.substring(0, 4)}`,
+                      wins: typeof data === 'object' ? data.wins : data,
+                    }))
+                    .sort((a, b) => b.wins - a.wins);
+
+                  if (sortedEntries.length === 0) {
+                    return (
+                      <div style={{ color: colors.textMuted, fontStyle: 'italic', padding: 20, textAlign: 'center' }}>
+                        No games played yet in this room.
+                      </div>
+                    );
+                  }
+
+                  return sortedEntries.map((entry, idx) => {
+                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
+                    return (
+                      <div key={entry.id} style={styles.playerItem}>
+                        <div style={styles.playerAvatar}>{medal}</div>
+                        <span style={styles.playerName}>{entry.name}</span>
+                        <span style={styles.hostBadge}>{entry.wins} WINS</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Room Settings Panel */}
@@ -320,11 +409,21 @@ const App: React.FC = () => {
               <>
                 <button
                   onClick={() => wsClient.send('game.action', { type: 'START', data: {} })}
-                  style={styles.startButton}
+                  disabled={room.players.length < room.game.minPlayers}
+                  style={{
+                    ...styles.startButton,
+                    ...(room.players.length < room.game.minPlayers ? styles.disabledButton : {}),
+                  }}
                 >
                   START MATCH
                 </button>
-                <p style={styles.waitHint}>Wait for everyone to join before starting!</p>
+                {room.players.length < room.game.minPlayers ? (
+                  <p style={{ ...styles.waitHint, color: colors.danger, fontWeight: 'bold' }}>
+                    Need at least {room.game.minPlayers} players to start! (Current: {room.players.length})
+                  </p>
+                ) : (
+                  <p style={styles.waitHint}>Wait for everyone to join before starting!</p>
+                )}
               </>
             ) : (
               <div style={styles.centerColumn}>
@@ -823,6 +922,25 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     width: '100%',
     transition: 'background 0.2s',
+  },
+  gameSelectInput: {
+    background: 'rgba(15, 23, 42, 0.8)',
+    border: '2px solid rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 900,
+    padding: '6px 12px',
+    outline: 'none',
+    cursor: 'pointer',
+    fontFamily: 'system-ui, sans-serif',
+    textTransform: 'uppercase',
+  },
+  disabledButton: {
+    background: '#475569',
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+    opacity: 0.6,
   },
 };
 

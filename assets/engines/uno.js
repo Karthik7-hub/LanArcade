@@ -41,6 +41,8 @@ const engine = {
         this.state.settings = { ...this.state.settings, ...settings };
         this.state.playerIds = players.map(p => p.id);
         this.state.unoDeclared = {};
+        this.state.finishedPlayers = [];
+        this.state.placements = [];
         
         // Initialize scores
         this.state.scores = {};
@@ -62,6 +64,8 @@ const engine = {
         this.state.discardPile = [];
         this.state.drawPending = 0;
         this.state.unoDeclared = {};
+        this.state.finishedPlayers = [];
+        this.state.placements = [];
         
         // Clear hands and deal cards
         this.state.playerIds.forEach(id => {
@@ -211,9 +215,9 @@ const engine = {
             delete this.state.unoDeclared[player.id];
         }
 
-        // Check Round Win
-        if (hand.length === 0) {
-            this.endRound(player.id);
+        // Check Win/Placement
+        if (this.checkWinState(player.id)) {
+            this.sync();
             return;
         }
 
@@ -222,17 +226,21 @@ const engine = {
             if (card.value === '0') {
                 this.rotateHands();
             } else if (card.value === '7') {
-                if (data.swapPlayerId && this.state.playerIds.includes(data.swapPlayerId) && data.swapPlayerId !== player.id) {
-                    this.swapHands(player.id, data.swapPlayerId);
-                } else {
-                    // Default to next player
-                    const nextId = this.getNextPlayerId();
-                    this.swapHands(player.id, nextId);
-                }
-                // Check win after swap (if swapped player got 0 cards somehow? No, they swapped hands)
-                if (this.state.hands[player.id].length === 0) {
-                    this.endRound(player.id);
-                    return;
+                const targetId = (data.swapPlayerId && this.state.playerIds.includes(data.swapPlayerId) && data.swapPlayerId !== player.id)
+                    ? data.swapPlayerId
+                    : this.getNextPlayerId();
+                
+                this.swapHands(player.id, targetId);
+
+                // Check win states for both players involved in the swap
+                const p1Finished = this.checkWinState(player.id);
+                const p2Finished = this.checkWinState(targetId);
+                
+                if (p1Finished || p2Finished) {
+                    if (this.state.status === 'finished') {
+                        this.sync();
+                        return;
+                    }
                 }
             }
         }
@@ -368,13 +376,27 @@ const engine = {
 
     advanceTurn: function(steps) {
         const n = this.state.playerIds.length;
-        this.state.currentPlayerIndex = (this.state.currentPlayerIndex + (this.state.direction * steps) + n) % n;
+        let index = this.state.currentPlayerIndex;
+        index = (index + (this.state.direction * steps) + n) % n;
+        
+        let attempts = 0;
+        while (this.state.finishedPlayers.includes(this.state.playerIds[index]) && attempts < n) {
+            index = (index + this.state.direction + n) % n;
+            attempts++;
+        }
+        
+        this.state.currentPlayerIndex = index;
         console.log("Turn advanced to: player " + this.state.playerIds[this.state.currentPlayerIndex]);
     },
 
     getNextPlayerId: function() {
         const n = this.state.playerIds.length;
-        const idx = (this.state.currentPlayerIndex + this.state.direction + n) % n;
+        let idx = (this.state.currentPlayerIndex + this.state.direction + n) % n;
+        let attempts = 0;
+        while (this.state.finishedPlayers.includes(this.state.playerIds[idx]) && attempts < n) {
+            idx = (idx + this.state.direction + n) % n;
+            attempts++;
+        }
         return this.state.playerIds[idx];
     },
 
@@ -417,34 +439,26 @@ const engine = {
         });
     },
 
-    endRound: function(winnerId) {
-        let roundScore = 0;
-        this.state.playerIds.forEach(id => {
-            if (id === winnerId) return;
-            const hand = this.state.hands[id];
-            hand.forEach(card => {
-                if (card.color === 'Wild') {
-                    roundScore += 50;
-                } else if (card.value === 'DrawTwo' || card.value === 'Skip' || card.value === 'Reverse') {
-                    roundScore += 20;
-                } else {
-                    roundScore += parseInt(card.value) || 0;
+    checkWinState: function(playerId) {
+        const hand = this.state.hands[playerId];
+        if (hand && hand.length === 0) {
+            if (!this.state.finishedPlayers.includes(playerId)) {
+                this.state.finishedPlayers.push(playerId);
+                console.log("Player " + playerId + " finished at placement " + this.state.finishedPlayers.length);
+            }
+
+            const activePlayers = this.state.playerIds.filter(id => !this.state.finishedPlayers.includes(id));
+            if (activePlayers.length <= 1) {
+                if (activePlayers.length === 1 && !this.state.finishedPlayers.includes(activePlayers[0])) {
+                    this.state.finishedPlayers.push(activePlayers[0]);
                 }
-            });
-        });
-
-        this.state.scores[winnerId] += roundScore;
-        console.log("Round ended! Winner: " + winnerId + " (+ " + roundScore + " pts). Total score: " + this.state.scores[winnerId]);
-
-        const limit = this.state.settings.scoreLimit || 500;
-        if (this.state.scores[winnerId] >= limit) {
-            this.state.status = 'finished';
-            this.state.winner = winnerId;
-            console.log("Game finished! Grand winner: " + winnerId);
-        } else {
-            this.state.round++;
-            this.startRound();
+                this.state.status = 'finished';
+                this.state.winner = this.state.finishedPlayers[0];
+                console.log("Game finished! placements: " + JSON.stringify(this.state.finishedPlayers));
+                return true;
+            }
         }
+        return false;
     },
 
     validateState: function() {
@@ -517,7 +531,8 @@ const engine = {
             turnTimer: this.state.settings.turnTimer,
             settings: this.state.settings,
             playerCardCounts: {},
-            unoDeclared: this.state.unoDeclared
+            unoDeclared: this.state.unoDeclared,
+            finishedPlayers: this.state.finishedPlayers || []
         };
         this.state.playerIds.forEach(id => {
             publicState.playerCardCounts[id] = this.state.hands[id] ? this.state.hands[id].length : 0;

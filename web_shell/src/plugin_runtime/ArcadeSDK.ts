@@ -23,6 +23,10 @@ export const ArcadeSDK = {
         });
     },
 
+    returnToLobby: () => {
+        wsClient.send('room.reset', {});
+    },
+
     onUpdate: (callback: () => void) => {
         const unsubscribe = useStore.subscribe(callback);
         activeSubscriptions.push(unsubscribe);

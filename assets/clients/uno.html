@@ -502,31 +502,36 @@
             right: 24px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            align-items: center;
+            gap: 8px;
             z-index: 200;
         }
 
-        .action-btn {
-            padding: 14px 28px;
-            border-radius: 50px;
-            border: 3px solid #fff;
-            color: #fff;
+        .catch-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
             font-weight: 900;
-            font-size: 16px;
-            cursor: pointer;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
-            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            font-size: 9px;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            border: 3px solid #fde68a;
+            background: linear-gradient(to bottom right, #f59e0b, #d97706);
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            animation: pulse 1s infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.2;
+            padding: 4px;
         }
 
-        .action-btn.catch {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            border-color: #fde68a;
-        }
-
-        .action-btn.catch:active {
-            transform: scale(0.95);
+        .catch-btn:active {
+            transform: scale(0.9);
             box-shadow: 0 0 15px rgba(245, 158, 11, 0.7);
         }
 
@@ -551,6 +556,95 @@
 
         .spin-ccw {
             animation: spin 8s linear infinite reverse;
+        }
+
+        /* --- LEADERBOARD PANEL --- */
+        #leaderboard-toggle {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #leaderboard-toggle:active { transform: scale(0.95); }
+
+        #leaderboard-panel {
+            position: absolute;
+            top: 44px;
+            left: 12px;
+            width: 220px;
+            max-height: 260px;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            padding: 12px;
+            gap: 6px;
+        }
+        #leaderboard-panel.open { display: flex; }
+
+        .lb-header {
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #fbbf24;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 2px;
+        }
+
+        .lb-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: background 0.15s;
+        }
+        .lb-entry:hover { background: rgba(255, 255, 255, 0.08); }
+
+        .lb-name {
+            font-weight: 700;
+            font-size: 12px;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lb-wins {
+            font-weight: 900;
+            font-size: 12px;
+            color: #fbbf24;
+            background: rgba(251, 191, 36, 0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .lb-empty {
+            color: #64748b;
+            font-size: 11px;
+            font-style: italic;
+            text-align: center;
+            padding: 12px 0;
         }
 
         /* --- ORIENTATION OVERLAY --- */
@@ -597,9 +691,13 @@
 <body>
 
     <div id="game-screen">
-        <!-- Badges & Status row -->
+        <!-- Leaderboard Toggle & Panel -->
         <div style="position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; flex-direction: column; gap: 4px;">
-            <div class="status-badge" id="round-indicator">ROUND 1</div>
+            <button id="leaderboard-toggle" onclick="toggleLeaderboard()">🏆 <span id="lb-btn-label">LEADERBOARD</span></button>
+            <div id="leaderboard-panel">
+                <div class="lb-header">🏆 Room Leaderboard</div>
+                <div id="lb-entries"></div>
+            </div>
         </div>
         
         <div style="position: absolute; top: 12px; right: 12px; z-index: 20; display: flex; flex-direction: column; gap: 4px;">
@@ -645,9 +743,9 @@
     </div>
 
     <div id="winner-overlay">
-        <h2>🎉</h2>
-        <h2 id="winner-name"></h2>
-        <p>wins the game!</p>
+        <h2 style="font-size: 32px; font-weight: 900; background: linear-gradient(135deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎉 MATCH COMPLETED 🎉</h2>
+        <div id="placement-list" style="margin: 20px 0; min-width: 250px; display: flex; flex-direction: column; gap: 10px;"></div>
+        <button id="lobby-redirect-btn" style="display:none; padding: 12px 24px; border-radius: 12px; border: none; background: #3b82f6; color: white; font-weight: bold; cursor: pointer; margin-top: 10px;">RETURN TO LOBBY</button>
     </div>
 
     <div id="toast"></div>
@@ -669,7 +767,68 @@
             console.error("Arcade SDK not found. UNO client must be run inside LAN Arcade platform.");
         }
 
+        function getOrdinal(n) {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return s[(v - 20) % 10] || s[v] || s[0];
+        }
+
         let selectedCardIdx = null;
+        let lbOpen = false;
+        const catchableTimestamps = {}; // { oppId: firstSeenTimestamp }
+
+        // --- LEADERBOARD FUNCTIONS ---
+        function toggleLeaderboard() {
+            lbOpen = !lbOpen;
+            const panel = document.getElementById('leaderboard-panel');
+            if (lbOpen) {
+                panel.classList.add('open');
+                updateLeaderboardPanel();
+            } else {
+                panel.classList.remove('open');
+            }
+        }
+
+        // Close leaderboard when clicking outside
+        document.addEventListener('click', function(e) {
+            if (lbOpen && !e.target.closest('#leaderboard-panel') && !e.target.closest('#leaderboard-toggle')) {
+                lbOpen = false;
+                document.getElementById('leaderboard-panel').classList.remove('open');
+            }
+        }, true);
+
+        function updateLeaderboardPanel() {
+            if (!Arcade) return;
+            const room = Arcade.getRoom();
+            if (!room) return;
+
+            const leaderboardData = room.settings?._leaderboard || {};
+            const entriesEl = document.getElementById('lb-entries');
+            if (!entriesEl) return;
+
+            const sorted = Object.entries(leaderboardData)
+                .map(([id, data]) => ({
+                    id,
+                    name: typeof data === 'object' ? data.name : `Player`,
+                    wins: typeof data === 'object' ? (data.wins || 0) : (data || 0),
+                }))
+                .sort((a, b) => b.wins - a.wins);
+
+            if (sorted.length === 0) {
+                entriesEl.innerHTML = '<div class="lb-empty">No wins recorded yet.<br>Play a match!</div>';
+                return;
+            }
+
+            entriesEl.innerHTML = sorted.map((entry, idx) => {
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+                return `
+                    <div class="lb-entry">
+                        <span class="lb-name">${medal} ${entry.name}</span>
+                        <span class="lb-wins">${entry.wins} W</span>
+                    </div>
+                `;
+            }).join('');
+        }
 
         // --- SVGs ---
         const SVG_SKIP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:100%; height:100%;"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>`;
@@ -894,19 +1053,40 @@
             if (!publicState || !room) return;
 
             // 1. Winner Check
-            if (publicState.status === 'finished' && publicState.winner) {
-                const winnerName = room.players.find(p => p.id === publicState.winner)?.name || 'Unknown';
-                document.getElementById('winner-name').textContent = winnerName.toUpperCase();
+            const finishedPlayers = publicState.finishedPlayers || [];
+            if (publicState.status === 'finished' && finishedPlayers.length > 0) {
+                const placementList = document.getElementById('placement-list');
+                if (placementList) {
+                    placementList.innerHTML = finishedPlayers.map((pid, idx) => {
+                        const name = room.players.find(p => p.id === pid)?.name || 'Unknown';
+                        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:8px 16px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+                                <span style="font-weight:bold; color:#f8fafc;">${medal} ${idx + 1}${getOrdinal(idx + 1)} Place</span>
+                                <span style="font-weight:900; color:#fbbf24;">${name.toUpperCase()}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                const isHost = player.id === room.hostId;
+                const redirectBtn = document.getElementById('lobby-redirect-btn');
+                if (redirectBtn) {
+                    if (isHost) {
+                        redirectBtn.style.display = 'block';
+                    } else {
+                        redirectBtn.style.display = 'none';
+                    }
+                }
+
                 document.getElementById('winner-overlay').style.display = 'flex';
                 return;
             } else {
                 document.getElementById('winner-overlay').style.display = 'none';
             }
 
-            // 2. Update Round Badge
-            const scores = publicState.scores || {};
-            const scoreLimit = publicState.settings?.scoreLimit || 500;
-            document.getElementById('round-indicator').innerHTML = `ROUND ${publicState.round || 1}<br><span style="font-size: 10px; color: #3b82f6;">SCORE: ${scores[player.id] || 0} / ${scoreLimit} pts</span>`;
+            // 2. Update Leaderboard
+            updateLeaderboardPanel();
 
             // 3. Update Timer Badge
             const timerEl = document.getElementById('timer-indicator');
@@ -947,14 +1127,27 @@
                 const badgeCount = cardCounts[opp.id] || 0;
                 let initial = opp.name.startsWith('Bot ') ? opp.name.replace('Bot ', 'B') : opp.name.substring(0, 2).toUpperCase();
                 
+                const isFinished = finishedPlayers.includes(opp.id);
+                const placementIdx = finishedPlayers.indexOf(opp.id);
+                const placementText = placementIdx !== -1 ? `${placementIdx + 1}${getOrdinal(placementIdx + 1)}` : '';
+                
+                let badgeHTML = '';
+                if (isFinished) {
+                    badgeHTML = `<span style="color:#fbbf24; font-weight:bold; font-size:10px;">🏆 ${placementText}</span>`;
+                } else {
+                    badgeHTML = `
+                        <div class="badge-icon"></div>
+                        <span style="color:white; font-weight:bold;">${badgeCount}</span>
+                    `;
+                }
+
                 return `
                     <div class="avatar-node ${isActive ? 'active' : ''}" style="left: ${x}%; top: ${y}%; ${scale}; z-index: ${isActive ? 50 : 10}">
                         <div style="position:relative">
                             <div class="avatar-spinner"></div>
                             <div class="avatar-circle">${initial}</div>
-                            <div class="avatar-badge">
-                                <div class="badge-icon"></div>
-                                <span style="color:white; font-weight:bold;">${badgeCount}</span>
+                            <div class="avatar-badge" style="display:flex; align-items:center; justify-content:center;">
+                                ${badgeHTML}
                             </div>
                         </div>
                         <div style="margin-top: 4px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; font-size: 10px; white-space: nowrap;">${opp.name}</div>
@@ -964,8 +1157,23 @@
 
             // 6. Render Hand
             const hand = privateState?.hand || [];
-            
-            if (hand.length > 15) {
+            const isLocalFinished = finishedPlayers.includes(player.id);
+
+            if (isLocalFinished) {
+                const placementIdx = finishedPlayers.indexOf(player.id);
+                const placementText = placementIdx !== -1 ? `${placementIdx + 1}${getOrdinal(placementIdx + 1)}` : '';
+                DOM.handContainer.style.overflowX = 'visible';
+                DOM.handContainer.style.justifyContent = 'center';
+                DOM.handContainer.style.paddingLeft = '0';
+                DOM.handContainer.style.paddingRight = '0';
+                DOM.handContainer.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height:120px; width:100%; color:#fbbf24;">
+                        <span style="font-size: 32px;">🏆</span>
+                        <span style="font-weight:900; font-size:20px; text-transform:uppercase;">FINISHED ${placementText} PLACE!</span>
+                        <span style="color:#94a3b8; font-size:12px;">Spectating remaining players...</span>
+                    </div>
+                `;
+            } else if (hand.length > 15) {
                 // Horizontal scrolling layout for high card counts
                 DOM.handContainer.style.overflowX = 'auto';
                 DOM.handContainer.style.justifyContent = 'flex-start';
@@ -1069,16 +1277,42 @@
             const actionsEl = document.getElementById('uno-actions');
             actionsEl.innerHTML = '';
             const uncaughtOpps = room.players.filter(p => p.id !== player.id && cardCounts[p.id] === 1 && !unoDeclared[p.id]);
+            const now = Date.now();
+
+            // Track when each opponent first became catchable
+            const currentCatchableIds = new Set(uncaughtOpps.map(o => o.id));
+            // Add new catchable opponents
             uncaughtOpps.forEach(opp => {
+                if (!catchableTimestamps[opp.id]) {
+                    catchableTimestamps[opp.id] = now;
+                }
+            });
+            // Clean up opponents no longer catchable
+            Object.keys(catchableTimestamps).forEach(id => {
+                if (!currentCatchableIds.has(id)) {
+                    delete catchableTimestamps[id];
+                }
+            });
+
+            uncaughtOpps.forEach(opp => {
+                const elapsed = now - (catchableTimestamps[opp.id] || now);
+                if (elapsed < 2000) return; // 2-second activation delay
+
+                const shortName = opp.name.length > 6 ? opp.name.substring(0, 5) + '!' : opp.name + '!';
                 const btn = document.createElement('button');
-                btn.className = 'action-btn catch';
-                btn.textContent = `Catch ${opp.name}! 🎴`;
+                btn.className = 'catch-btn';
+                btn.textContent = `CATCH ${shortName.toUpperCase()}`;
                 btn.onclick = (e) => {
                     e.preventDefault();
                     safeAction('CATCH_UNO', { targetId: opp.id });
                 };
                 actionsEl.appendChild(btn);
             });
+
+            // If there are catchable opps still in delay, schedule a re-render
+            if (uncaughtOpps.some(opp => (now - (catchableTimestamps[opp.id] || now)) < 2000)) {
+                setTimeout(updateUI, 500);
+            }
         }
 
         // --- WINDOW EVENTS ---
@@ -1088,6 +1322,15 @@
 
         // --- INITIALIZATION ---
         window.addEventListener('DOMContentLoaded', () => {
+            const redirectBtn = document.getElementById('lobby-redirect-btn');
+            if (redirectBtn) {
+                redirectBtn.onclick = () => {
+                    if (window.parent.Arcade && typeof window.parent.Arcade.returnToLobby === 'function') {
+                        window.parent.Arcade.returnToLobby();
+                    }
+                };
+            }
+            
             if (Arcade) {
                 Arcade.onUpdate(updateUI);
                 updateUI();

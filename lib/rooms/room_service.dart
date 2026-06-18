@@ -97,6 +97,16 @@ class RoomService {
     );
   }
 
+  Future<void> updateGame(String roomId, models.GameManifest game, Map<String, dynamic> settings) async {
+    await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
+      RoomsCompanion(
+        gameId: Value(game.id),
+        settingsJson: Value(jsonEncode(settings)),
+        lastActiveAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   Future<void> updateHost(String roomId, String hostId) async {
     await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
       RoomsCompanion(
