@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -8,7 +9,9 @@ import 'package:fl_chart/fl_chart.dart';
 import '../kernel/kernel_manager.dart';
 import '../discovery/discovery_service.dart';
 import 'diagnostics_screen.dart';
+import 'storage_cleanup_screen.dart';
 import 'theme.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -21,6 +24,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final KernelManager _kernel = KernelManager();
   final DiscoveryService _discovery = DiscoveryService();
   final NetworkInfo _networkInfo = NetworkInfo();
+  StreamSubscription? _subscription;
   
   bool _isRunning = false;
   String? _ipAddress;
@@ -31,7 +35,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    _kernel.statsStream.listen((event) {
+    _subscription = _kernel.statsStream.listen((event) {
       if (mounted) {
         setState(() {
           if (event.containsKey('status')) {
@@ -54,9 +58,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   void dispose() {
-    _kernel.stop();
+    _subscription?.cancel();
+    _kernel.dispose();
     _discovery.stop();
     super.dispose();
+  }
+
+  Future<void> _requestPermissions() async {
+    if (Platform.isAndroid) {
+      // 1. Notification Permission (Needed for Foreground Service notification on Android 13+)
+      final notificationStatus = await Permission.notification.status;
+      if (!notificationStatus.isGranted) {
+        await Permission.notification.request();
+      }
+
+      // 2. Ignore Battery Optimizations (Allows background execution without service killings)
+      final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+      if (!batteryStatus.isGranted) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+
+      // 3. Location Permission (Needed by network_info_plus on Android to read local network details/IP/SSID)
+      final locationStatus = await Permission.location.status;
+      if (!locationStatus.isGranted) {
+        await Permission.location.request();
+      }
+    }
   }
 
   void _toggleServer() async {
@@ -112,6 +139,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _ipAddress = null;
       });
     } else {
+      await _requestPermissions();
       await _kernel.start();
       String? ip = await _networkInfo.getWifiIP();
       if (ip == null || ip.isEmpty) {
@@ -161,8 +189,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 padding: const EdgeInsets.all(20),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    _buildHeroSection(),
-                    const SizedBox(height: 24),
                     _buildStatsRow(),
                     const SizedBox(height: 24),
                     if (_isRunning) _buildNetworkCard(),
@@ -185,6 +211,48 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Widget _buildStatusBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: _isRunning ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _isRunning ? Colors.greenAccent : Colors.redAccent,
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _isRunning ? Colors.greenAccent : Colors.redAccent,
+            ),
+          ).animate(
+            onPlay: (controller) {
+              if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+                controller.repeat(reverse: true);
+              }
+            },
+          ).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 1.seconds),
+          const SizedBox(width: 4),
+          Text(
+            _isRunning ? 'LIVE' : 'OFFLINE',
+            style: GoogleFonts.blackOpsOne(
+              color: _isRunning ? Colors.greenAccent : Colors.redAccent,
+              fontSize: 8,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAppBar() {
     return SliverAppBar(
       backgroundColor: Colors.transparent,
@@ -194,20 +262,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Image.asset(
             'assets/logo.png',
-            height: 32,
+            height: 24,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Text(
             'LAN ARCADE',
             style: GoogleFonts.blackOpsOne(
-              fontSize: 24,
-              letterSpacing: 2,
+              fontSize: 18,
+              letterSpacing: 1.5,
               color: ArcadeTheme.primaryColor,
             ),
           ),
+          const SizedBox(width: 8),
+          _buildStatusBadge(),
         ],
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.cleaning_services_outlined),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => StorageCleanupScreen(kernel: _kernel)),
+          ),
+        ),
         IconButton(
           icon: const Icon(Icons.analytics_outlined),
           onPressed: () => Navigator.push(
@@ -216,38 +293,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildHeroSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: ArcadeTheme.surfaceColor.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        children: [
-          Hero(
-            tag: 'app-logo',
-            child: Image.asset(
-              'assets/logo.png',
-              height: 120,
-            ),
-          ).animate(target: _isRunning ? 1 : 0).shimmer(duration: 2.seconds).shake(),
-          const SizedBox(height: 16),
-          Text(
-            _isRunning ? 'ARCADE IS LIVE' : 'SYSTEM OFFLINE',
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-          ),
-          Text(
-            _isRunning ? 'Players can now discover and join rooms' : 'Start the server to begin hosting games',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-          ),
-        ],
-      ),
     );
   }
 

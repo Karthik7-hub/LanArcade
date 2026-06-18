@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../kernel/kernel_manager.dart';
 
@@ -12,11 +13,12 @@ class DiagnosticsScreen extends StatefulWidget {
 class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   final List<String> _logs = [];
   String _status = 'OFFLINE';
+  StreamSubscription? _subscription;
 
   @override
   void initState() {
     super.initState();
-    widget.kernel.statsStream.listen((event) {
+    _subscription = widget.kernel.statsStream.listen((event) {
       if (mounted) {
         setState(() {
           if (event.containsKey('status')) {
@@ -30,6 +32,13 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       }
     });
   }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
 
   @override
   Widget build(BuildContext context) {

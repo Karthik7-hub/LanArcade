@@ -1,6 +1,8 @@
 import { useStore } from '../shell/store';
 import { wsClient } from '../shell/WebSocketClient';
 
+let activeSubscriptions: (() => void)[] = [];
+
 /**
  * The Global SDK exposed to games.
  */
@@ -23,15 +25,32 @@ export const ArcadeSDK = {
 
     onUpdate: (callback: () => void) => {
         const unsubscribe = useStore.subscribe(callback);
+        activeSubscriptions.push(unsubscribe);
+        
         const iframe = document.getElementById('game-frame') as HTMLIFrameElement | null;
         if (iframe && iframe.contentWindow) {
             iframe.contentWindow.addEventListener('unload', () => {
                 unsubscribe();
+                activeSubscriptions = activeSubscriptions.filter(fn => fn !== unsubscribe);
             });
         }
-        return unsubscribe;
+        
+        return () => {
+            unsubscribe();
+            activeSubscriptions = activeSubscriptions.filter(fn => fn !== unsubscribe);
+        };
+    },
+
+    clearSubscriptions: () => {
+        activeSubscriptions.forEach((unsub) => {
+            try {
+                unsub();
+            } catch (_) {}
+        });
+        activeSubscriptions = [];
     }
 };
 
 // Expose to window so the Iframe (Game) can access it via window.parent.Arcade
 (window as any).Arcade = ArcadeSDK;
+

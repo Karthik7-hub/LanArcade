@@ -6,13 +6,19 @@ import GameLoader from './plugin_runtime/GameLoader';
 import './plugin_runtime/ArcadeSDK'; // Initialize SDK
 import type { GameManifest } from './shared/types';
 
+
 const App: React.FC = () => {
-  const { isConnected, player, room, setPlayer, publicGameState, debugLogs, clearDebugLogs, errorAlert, setErrorAlert } = useStore();
+  const isConnected = useStore((state) => state.isConnected);
+  const player = useStore((state) => state.player);
+  const room = useStore((state) => state.room);
+  const errorAlert = useStore((state) => state.errorAlert);
+  const setPlayer = useStore((state) => state.setPlayer);
+  const setErrorAlert = useStore((state) => state.setErrorAlert);
+
   const [nameInput, setNameInput] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [availableGames, setAvailableGames] = useState<GameManifest[]>([]);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
-  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     // Initial identity check
@@ -182,7 +188,7 @@ const App: React.FC = () => {
       );
     }
 
-    if (room.status !== 'waiting' && publicGameState) {
+    if (room.status !== 'waiting') {
       return <GameLoader />;
     }
 
@@ -349,78 +355,7 @@ const App: React.FC = () => {
         </div>
       )}
       {renderView()}
-      
-      {/* Floating Debug Trigger */}
-      {isConnected && (
-        <button onClick={() => setShowDebug(!showDebug)} style={styles.debugToggleBtn}>
-          🐞 {showDebug ? 'CLOSE DEBUG' : 'DEBUG PANEL'}
-        </button>
-      )}
 
-      {/* Floating Debug Panel */}
-      {showDebug && (
-        <div style={styles.debugPanel}>
-          <div style={styles.debugHeader}>
-            <h3 style={styles.debugTitle}>DEVELOPER AUDIT PANEL</h3>
-            <button onClick={() => setShowDebug(false)} style={styles.debugCloseBtn}>×</button>
-          </div>
-          <div style={styles.debugContent}>
-            <div style={styles.debugSection}>
-              <h4 style={styles.debugSecTitle}>System Status</h4>
-              <div>Connection: <span style={{ color: colors.accent, fontWeight: 'bold' }}>CONNECTED</span></div>
-              {player && <div>Player: {player.name} ({player.id.substring(0, 6)}...)</div>}
-              {room && (
-                <>
-                  <div>Room Code: <span style={{ color: colors.secondary, fontWeight: 'bold' }}>{room.code}</span></div>
-                  <div>Status: {room.status.toUpperCase()}</div>
-                  <div>Game: {room.game.name} ({room.game.id})</div>
-                </>
-              )}
-            </div>
-
-            {room && (
-              <div style={styles.debugSection}>
-                <h4 style={styles.debugSecTitle}>Active Settings</h4>
-                <pre style={{ margin: 0, overflowX: 'auto', background: colors.bg, padding: 6, borderRadius: 6 }}>
-                  {JSON.stringify(room.settings, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            {publicGameState && (
-              <div style={styles.debugSection}>
-                <h4 style={styles.debugSecTitle}>Public Game State</h4>
-                <pre style={{ margin: 0, overflowX: 'auto', maxHeight: 150, overflowY: 'auto', background: colors.bg, padding: 6, borderRadius: 6 }}>
-                  {JSON.stringify(publicGameState, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            <div style={{ ...styles.debugSection, flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <h4 style={{ ...styles.debugSecTitle, margin: 0 }}>WebSocket Event Log</h4>
-                <button onClick={clearDebugLogs} style={{ background: 'none', border: 'none', color: colors.danger, cursor: 'pointer', fontSize: 10, fontWeight: 'bold' }}>CLEAR</button>
-              </div>
-              <div style={styles.debugConsole}>
-                {debugLogs.length === 0 ? (
-                  <div style={{ color: colors.textMuted, fontStyle: 'italic' }}>No events recorded.</div>
-                ) : (
-                  debugLogs.map((log, index) => {
-                    const isOut = log.startsWith('→');
-                    const color = isOut ? colors.secondary : colors.accent;
-                    return (
-                      <div key={index} style={styles.debugLogLine}>
-                        <span style={{ color }}>{log.substring(0, 6)}</span>
-                        {log.substring(6)}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
@@ -834,97 +769,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: 18,
     cursor: 'pointer',
   },
-  debugToggleBtn: {
-    position: 'fixed' as const,
-    bottom: 20,
-    left: 20,
-    zIndex: 10000,
-    background: '#1e293b',
-    border: '2px solid rgba(255,255,255,0.2)',
-    borderRadius: 30,
-    padding: '8px 16px',
-    color: '#fbbf24',
-    fontWeight: 800,
-    fontSize: 12,
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-    letterSpacing: 1,
-  },
-  debugPanel: {
-    position: 'fixed' as const,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 360,
-    background: 'rgba(15, 23, 42, 0.95)',
-    backdropFilter: 'blur(16px)',
-    borderLeft: '2px solid rgba(255,255,255,0.1)',
-    zIndex: 9999,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    color: '#fff',
-    boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-  },
-  debugHeader: {
-    padding: '16px 20px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  debugTitle: {
-    margin: 0,
-    fontSize: 14,
-    fontWeight: 900,
-    letterSpacing: 2,
-    color: '#fbbf24',
-  },
-  debugCloseBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#94a3b8',
-    fontSize: 20,
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
-  debugContent: {
-    flex: 1,
-    overflowY: 'auto' as const,
-    padding: 20,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: 16,
-    fontSize: 12,
-  },
-  debugSection: {
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: 12,
-    border: '1px solid rgba(255,255,255,0.05)',
-    padding: 12,
-  },
-  debugSecTitle: {
-    margin: '0 0 8px 0',
-    fontSize: 11,
-    fontWeight: 800,
-    color: '#3b82f6',
-    letterSpacing: 1,
-    textTransform: 'uppercase' as const,
-  },
-  debugConsole: {
-    background: '#020617',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    padding: 8,
-    fontFamily: 'monospace',
-    maxHeight: 180,
-    overflowY: 'auto' as const,
-    whiteSpace: 'pre-wrap' as const,
-  },
-  debugLogLine: {
-    margin: '0 0 4px 0',
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-    paddingBottom: 2,
-  },
+
   errorAlertOverlay: {
     position: 'fixed' as const,
     inset: 0,

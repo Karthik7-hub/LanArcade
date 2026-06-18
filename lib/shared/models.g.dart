@@ -85,4 +85,5 @@ const _$RoomStatusEnumMap = {
   RoomStatus.waiting: 'waiting',
   RoomStatus.active: 'active',
   RoomStatus.finished: 'finished',
+  RoomStatus.abandoned: 'abandoned',
 };

@@ -35,6 +35,7 @@ class RoomService {
       status: models.RoomStatus.waiting,
       settingsJson: jsonEncode(settings),
       createdAt: DateTime.now(),
+      lastActiveAt: Value(DateTime.now()),
     ));
 
     return room;
@@ -53,35 +54,55 @@ class RoomService {
       payloadJson: jsonEncode(payloadMap),
       timestamp: DateTime.now(),
     ));
+
+    // Update last active
+    await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
+      RoomsCompanion(lastActiveAt: Value(DateTime.now())),
+    );
   }
 
   Future<void> updatePublicState(String roomId, Map<String, dynamic> state) async {
     await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
-      RoomsCompanion(publicGameStateJson: Value(jsonEncode(state))),
+      RoomsCompanion(
+        publicGameStateJson: Value(jsonEncode(state)),
+        lastActiveAt: Value(DateTime.now()),
+      ),
     );
   }
 
   Future<void> updatePlayers(String roomId, List<models.Player> players) async {
     await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
-      RoomsCompanion(playersJson: Value(jsonEncode(players.map((p) => p.toJson()).toList()))),
+      RoomsCompanion(
+        playersJson: Value(jsonEncode(players.map((p) => p.toJson()).toList())),
+        lastActiveAt: Value(DateTime.now()),
+      ),
     );
   }
 
   Future<void> updateStatus(String roomId, models.RoomStatus status) async {
     await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
-      RoomsCompanion(status: Value(status)),
+      RoomsCompanion(
+        status: Value(status),
+        lastActiveAt: Value(DateTime.now()),
+      ),
     );
   }
 
   Future<void> updateSettings(String roomId, Map<String, dynamic> settings) async {
     await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
-      RoomsCompanion(settingsJson: Value(jsonEncode(settings))),
+      RoomsCompanion(
+        settingsJson: Value(jsonEncode(settings)),
+        lastActiveAt: Value(DateTime.now()),
+      ),
     );
   }
 
   Future<void> updateHost(String roomId, String hostId) async {
     await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
-      RoomsCompanion(hostId: Value(hostId)),
+      RoomsCompanion(
+        hostId: Value(hostId),
+        lastActiveAt: Value(DateTime.now()),
+      ),
     );
   }
 

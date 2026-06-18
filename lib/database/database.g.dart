@@ -402,6 +402,17 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, DbRoom> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _lastActiveAtMeta = const VerificationMeta(
+    'lastActiveAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastActiveAt = GeneratedColumn<DateTime>(
+    'last_active_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -413,6 +424,7 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, DbRoom> {
     settingsJson,
     publicGameStateJson,
     createdAt,
+    lastActiveAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -494,6 +506,15 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, DbRoom> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('last_active_at')) {
+      context.handle(
+        _lastActiveAtMeta,
+        lastActiveAt.isAcceptableOrUnknown(
+          data['last_active_at']!,
+          _lastActiveAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -541,6 +562,10 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, DbRoom> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      lastActiveAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_active_at'],
+      ),
     );
   }
 
@@ -563,6 +588,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
   final String settingsJson;
   final String? publicGameStateJson;
   final DateTime createdAt;
+  final DateTime? lastActiveAt;
   const DbRoom({
     required this.id,
     required this.code,
@@ -573,6 +599,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
     required this.settingsJson,
     this.publicGameStateJson,
     required this.createdAt,
+    this.lastActiveAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -590,6 +617,9 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
       map['public_game_state_json'] = Variable<String>(publicGameStateJson);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastActiveAt != null) {
+      map['last_active_at'] = Variable<DateTime>(lastActiveAt);
+    }
     return map;
   }
 
@@ -606,6 +636,9 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
           ? const Value.absent()
           : Value(publicGameStateJson),
       createdAt: Value(createdAt),
+      lastActiveAt: lastActiveAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastActiveAt),
     );
   }
 
@@ -628,6 +661,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
         json['publicGameStateJson'],
       ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastActiveAt: serializer.fromJson<DateTime?>(json['lastActiveAt']),
     );
   }
   @override
@@ -645,6 +679,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
       'settingsJson': serializer.toJson<String>(settingsJson),
       'publicGameStateJson': serializer.toJson<String?>(publicGameStateJson),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastActiveAt': serializer.toJson<DateTime?>(lastActiveAt),
     };
   }
 
@@ -658,6 +693,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
     String? settingsJson,
     Value<String?> publicGameStateJson = const Value.absent(),
     DateTime? createdAt,
+    Value<DateTime?> lastActiveAt = const Value.absent(),
   }) => DbRoom(
     id: id ?? this.id,
     code: code ?? this.code,
@@ -670,6 +706,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
         ? publicGameStateJson.value
         : this.publicGameStateJson,
     createdAt: createdAt ?? this.createdAt,
+    lastActiveAt: lastActiveAt.present ? lastActiveAt.value : this.lastActiveAt,
   );
   DbRoom copyWithCompanion(RoomsCompanion data) {
     return DbRoom(
@@ -688,6 +725,9 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
           ? data.publicGameStateJson.value
           : this.publicGameStateJson,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastActiveAt: data.lastActiveAt.present
+          ? data.lastActiveAt.value
+          : this.lastActiveAt,
     );
   }
 
@@ -702,7 +742,8 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
           ..write('status: $status, ')
           ..write('settingsJson: $settingsJson, ')
           ..write('publicGameStateJson: $publicGameStateJson, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastActiveAt: $lastActiveAt')
           ..write(')'))
         .toString();
   }
@@ -718,6 +759,7 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
     settingsJson,
     publicGameStateJson,
     createdAt,
+    lastActiveAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -731,7 +773,8 @@ class DbRoom extends DataClass implements Insertable<DbRoom> {
           other.status == this.status &&
           other.settingsJson == this.settingsJson &&
           other.publicGameStateJson == this.publicGameStateJson &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.lastActiveAt == this.lastActiveAt);
 }
 
 class RoomsCompanion extends UpdateCompanion<DbRoom> {
@@ -744,6 +787,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
   final Value<String> settingsJson;
   final Value<String?> publicGameStateJson;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> lastActiveAt;
   final Value<int> rowid;
   const RoomsCompanion({
     this.id = const Value.absent(),
@@ -755,6 +799,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
     this.settingsJson = const Value.absent(),
     this.publicGameStateJson = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.lastActiveAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RoomsCompanion.insert({
@@ -767,6 +812,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
     required String settingsJson,
     this.publicGameStateJson = const Value.absent(),
     required DateTime createdAt,
+    this.lastActiveAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        code = Value(code),
@@ -786,6 +832,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
     Expression<String>? settingsJson,
     Expression<String>? publicGameStateJson,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastActiveAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -799,6 +846,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
       if (publicGameStateJson != null)
         'public_game_state_json': publicGameStateJson,
       if (createdAt != null) 'created_at': createdAt,
+      if (lastActiveAt != null) 'last_active_at': lastActiveAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -813,6 +861,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
     Value<String>? settingsJson,
     Value<String?>? publicGameStateJson,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? lastActiveAt,
     Value<int>? rowid,
   }) {
     return RoomsCompanion(
@@ -825,6 +874,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
       settingsJson: settingsJson ?? this.settingsJson,
       publicGameStateJson: publicGameStateJson ?? this.publicGameStateJson,
       createdAt: createdAt ?? this.createdAt,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -863,6 +913,9 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (lastActiveAt.present) {
+      map['last_active_at'] = Variable<DateTime>(lastActiveAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -881,6 +934,7 @@ class RoomsCompanion extends UpdateCompanion<DbRoom> {
           ..write('settingsJson: $settingsJson, ')
           ..write('publicGameStateJson: $publicGameStateJson, ')
           ..write('createdAt: $createdAt, ')
+          ..write('lastActiveAt: $lastActiveAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2399,6 +2453,7 @@ typedef $$RoomsTableCreateCompanionBuilder =
       required String settingsJson,
       Value<String?> publicGameStateJson,
       required DateTime createdAt,
+      Value<DateTime?> lastActiveAt,
       Value<int> rowid,
     });
 typedef $$RoomsTableUpdateCompanionBuilder =
@@ -2412,6 +2467,7 @@ typedef $$RoomsTableUpdateCompanionBuilder =
       Value<String> settingsJson,
       Value<String?> publicGameStateJson,
       Value<DateTime> createdAt,
+      Value<DateTime?> lastActiveAt,
       Value<int> rowid,
     });
 
@@ -2489,6 +2545,11 @@ class $$RoomsTableFilterComposer extends Composer<_$AppDatabase, $RoomsTable> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastActiveAt => $composableBuilder(
+    column: $table.lastActiveAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2571,6 +2632,11 @@ class $$RoomsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get lastActiveAt => $composableBuilder(
+    column: $table.lastActiveAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RoomsTableAnnotationComposer
@@ -2614,6 +2680,11 @@ class $$RoomsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastActiveAt => $composableBuilder(
+    column: $table.lastActiveAt,
+    builder: (column) => column,
+  );
 
   Expression<T> eventLogRefs<T extends Object>(
     Expression<T> Function($$EventLogTableAnnotationComposer a) f,
@@ -2678,6 +2749,7 @@ class $$RoomsTableTableManager
                 Value<String> settingsJson = const Value.absent(),
                 Value<String?> publicGameStateJson = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastActiveAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion(
                 id: id,
@@ -2689,6 +2761,7 @@ class $$RoomsTableTableManager
                 settingsJson: settingsJson,
                 publicGameStateJson: publicGameStateJson,
                 createdAt: createdAt,
+                lastActiveAt: lastActiveAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2702,6 +2775,7 @@ class $$RoomsTableTableManager
                 required String settingsJson,
                 Value<String?> publicGameStateJson = const Value.absent(),
                 required DateTime createdAt,
+                Value<DateTime?> lastActiveAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion.insert(
                 id: id,
@@ -2713,6 +2787,7 @@ class $$RoomsTableTableManager
                 settingsJson: settingsJson,
                 publicGameStateJson: publicGameStateJson,
                 createdAt: createdAt,
+                lastActiveAt: lastActiveAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

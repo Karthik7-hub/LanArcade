@@ -102,6 +102,7 @@
         let snapshot = null;
         let player = null;
         let keys = { left: false, right: false, jump: false };
+        let lastKeys = { left: false, right: false, jump: false };
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         function init() {
@@ -121,16 +122,6 @@
             // Gamepad support
             requestAnimationFrame(pollGamepad);
 
-            // Input sending loop (60Hz)
-            setInterval(() => {
-                if (!player) return;
-                Arcade.sendAction('INPUT', {
-                    left: keys.left,
-                    right: keys.right,
-                    jump: keys.jump
-                });
-            }, 1000 / 60);
-
             // Render loop
             requestAnimationFrame(render);
 
@@ -144,17 +135,35 @@
             });
         }
 
+        function sendInput() {
+            if (!player) return;
+            const changed = keys.left !== lastKeys.left ||
+                            keys.right !== lastKeys.right ||
+                            keys.jump !== lastKeys.jump;
+            if (changed) {
+                Arcade.sendAction('INPUT', {
+                    left: keys.left,
+                    right: keys.right,
+                    jump: keys.jump
+                });
+                lastKeys = { ...keys };
+            }
+        }
+
         function setupTouchControls() {
             const touchHandler = (e) => {
                 e.preventDefault();
                 const btn = e.currentTarget;
                 const key = btn.dataset.key;
-                if (e.type === 'touchstart' || e.type === 'mousedown') {
-                    keys[key] = true;
-                    btn.classList.add('pressed');
-                } else {
-                    keys[key] = false;
-                    btn.classList.remove('pressed');
+                const isDown = e.type === 'touchstart' || e.type === 'mousedown';
+                if (keys[key] !== isDown) {
+                    keys[key] = isDown;
+                    if (isDown) {
+                        btn.classList.add('pressed');
+                    } else {
+                        btn.classList.remove('pressed');
+                    }
+                    sendInput();
                 }
             };
 
@@ -170,11 +179,19 @@
 
         function pollGamepad() {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            let changed = false;
             for (const gp of gamepads) {
                 if (!gp) continue;
-                keys.left = gp.axes[0] < -0.3 || gp.buttons[14]?.pressed;
-                keys.right = gp.axes[0] > 0.3 || gp.buttons[15]?.pressed;
-                keys.jump = gp.buttons[0]?.pressed || gp.buttons[12]?.pressed;
+                const left = gp.axes[0] < -0.3 || gp.buttons[14]?.pressed;
+                const right = gp.axes[0] > 0.3 || gp.buttons[15]?.pressed;
+                const jump = gp.buttons[0]?.pressed || gp.buttons[12]?.pressed;
+                
+                if (keys.left !== left) { keys.left = left; changed = true; }
+                if (keys.right !== right) { keys.right = right; changed = true; }
+                if (keys.jump !== jump) { keys.jump = jump; changed = true; }
+            }
+            if (changed) {
+                sendInput();
             }
             requestAnimationFrame(pollGamepad);
         }
@@ -185,9 +202,14 @@
         }
 
         function handleKey(code, isDown) {
-            if (code === 'ArrowLeft' || code === 'KeyA') keys.left = isDown;
-            if (code === 'ArrowRight' || code === 'KeyD') keys.right = isDown;
-            if (code === 'Space' || code === 'ArrowUp' || code === 'KeyW') keys.jump = isDown;
+            let changed = false;
+            if ((code === 'ArrowLeft' || code === 'KeyA') && keys.left !== isDown) { keys.left = isDown; changed = true; }
+            if ((code === 'ArrowRight' || code === 'KeyD') && keys.right !== isDown) { keys.right = isDown; changed = true; }
+            if ((code === 'Space' || code === 'ArrowUp' || code === 'KeyW') && keys.jump !== isDown) { keys.jump = isDown; changed = true; }
+            
+            if (changed) {
+                sendInput();
+            }
         }
 
         function render() {

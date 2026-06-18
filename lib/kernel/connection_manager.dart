@@ -16,6 +16,10 @@ class Connection {
       'payload': payload,
     }));
   }
+
+  void close() {
+    socket.sink.close();
+  }
 }
 
 class ConnectionManager {
@@ -59,4 +63,14 @@ class ConnectionManager {
       conn.send(type, payload);
     }
   }
+
+  void closeAll() {
+    for (var conn in _connections.values) {
+      try {
+        conn.close();
+      } catch (_) {}
+    }
+    _connections.clear();
+  }
 }
+

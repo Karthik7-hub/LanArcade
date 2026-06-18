@@ -4,9 +4,13 @@ import { PlatformEvent } from '../shared/types';
 class WebSocketClient {
   private socket: WebSocket | null = null;
   private url: string = '';
+  private reconnectTimer: any = null;
+  private messageQueue: { type: string; payload: any }[] = [];
 
   connect(url: string) {
     this.url = url;
+    this.cleanup();
+
     this.socket = new WebSocket(url);
 
     this.socket.onopen = () => {
@@ -18,6 +22,13 @@ class WebSocketClient {
       if (player) {
         this.send('player.identify', player);
       }
+
+      // Flush message queue
+      const queue = [...this.messageQueue];
+      this.messageQueue = [];
+      queue.forEach((msg) => {
+        this.send(msg.type, msg.payload);
+      });
     };
 
     this.socket.onmessage = (event) => {
@@ -29,8 +40,37 @@ class WebSocketClient {
     this.socket.onclose = () => {
       console.log('Disconnected from Lan Arcade Kernel');
       useStore.getState().setConnected(false);
-      setTimeout(() => this.connect(this.url), 2000);
+      this.scheduleReconnect();
     };
+
+    this.socket.onerror = (err) => {
+      console.error('WebSocket error:', err);
+    };
+  }
+
+  private cleanup() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.socket) {
+      this.socket.onopen = null;
+      this.socket.onmessage = null;
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      try {
+        this.socket.close();
+      } catch (_) {}
+      this.socket = null;
+    }
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect(this.url);
+    }, 2000);
   }
 
   private handleEvent(event: PlatformEvent) {
@@ -84,8 +124,14 @@ class WebSocketClient {
     if (this.socket?.readyState === WebSocket.OPEN) {
       useStore.getState().addDebugLog(`→ OUT: ${type}`);
       this.socket.send(JSON.stringify({ type, payload }));
+    } else {
+      console.warn('Socket not open. Queueing message:', type);
+      if (type.startsWith('game.') || type.startsWith('room.')) {
+        this.messageQueue.push({ type, payload });
+      }
     }
   }
 }
 
 export const wsClient = new WebSocketClient();
+

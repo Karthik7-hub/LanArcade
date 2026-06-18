@@ -29,6 +29,7 @@ class Rooms extends Table {
   TextColumn get settingsJson => text()();
   TextColumn get publicGameStateJson => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get lastActiveAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -69,7 +70,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -79,6 +80,24 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(achievements);
+          }
+          if (from < 3) {
+            try {
+              await m.addColumn(rooms, rooms.lastActiveAt);
+            } catch (e) {
+              // Ignore if column already exists due to partial upgrades
+            }
+          }
+        },
+        beforeOpen: (details) async {
+          try {
+            final roomsTableInfo = await customSelect('PRAGMA table_info(rooms)').get();
+            final hasLastActiveAt = roomsTableInfo.any((row) => row.read<String>('name') == 'last_active_at');
+            if (!hasLastActiveAt) {
+              await customStatement('ALTER TABLE "rooms" ADD COLUMN "last_active_at" INTEGER');
+            }
+          } catch (e) {
+            // Ignore/log self-heal errors
           }
         },
       );

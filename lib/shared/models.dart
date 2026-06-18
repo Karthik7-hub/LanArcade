@@ -66,7 +66,7 @@ class GameManifest {
   Map<String, dynamic> toJson() => _$GameManifestToJson(this);
 }
 
-enum RoomStatus { waiting, active, finished }
+enum RoomStatus { waiting, active, finished, abandoned }
 
 @JsonSerializable()
 class Room {

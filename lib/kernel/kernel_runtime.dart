@@ -132,10 +132,10 @@ class KernelRuntime {
             final String type = data['type'];
             final dynamic payload = data['payload'];
             await _handleMessage(connectionId, type, payload);
-          } catch (e) {
-            _log.warning('Error processing WS message: $e');
+          } catch (e, stack) {
+            _log.severe('Error processing WS message: $e', e, stack);
             final conn = connectionManager.getConnection(connectionId);
-            conn?.send('system.error', 'Invalid message format');
+            conn?.send('system.error', 'Invalid message format: $e');
           }
         },
         onDone: () {
@@ -196,6 +196,12 @@ class KernelRuntime {
       timer.cancel();
     }
     _cleanupTimers.clear();
+
+    // Close all active connections
+    connectionManager.closeAll();
+
+    // Close the database to prevent SQLite file descriptor leak
+    await db.close();
 
     await _server?.close(force: true);
     _server = null;
@@ -558,7 +564,7 @@ class KernelRuntime {
     final room = roomData.remove(roomId);
     if (room != null) {
       _log.info('Destroying room ${room.code}');
-      await roomService.updateStatus(roomId, models.RoomStatus.finished);
+      await roomService.updateStatus(roomId, models.RoomStatus.abandoned);
     }
   }
 

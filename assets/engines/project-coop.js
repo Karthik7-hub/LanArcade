@@ -6,7 +6,7 @@
 
 const engine = {
     config: {
-        tickRate: 60,
+        tickRate: 20,
         gravity: 0.6,
         friction: 0.15,
         jumpForce: -13,
@@ -280,47 +280,57 @@ const engine = {
 
     onTick: function(dt) {
         if (this.state.status !== 'play') return;
-        this.state.tick++;
         
-        this.updateEntities(dt);
-        this.updateSwitches();
+        // Target physics rate is 60Hz. At 20Hz, we run 3 steps per tick.
+        const steps = 3;
+        const subDt = dt / steps;
 
+        for (let step = 0; step < steps; step++) {
+            this.state.tick++;
+            this.updateEntities(subDt);
+            this.updateSwitches();
+
+            for (let id in this.state.players) {
+                const p = this.state.players[id];
+                if (p.isDead) {
+                    if (typeof p.respawnTimer === 'number') {
+                        p.respawnTimer -= subDt;
+                        if (p.respawnTimer <= 0) {
+                            p.isDead = false;
+                            p.respawnTimer = null;
+                        }
+                    }
+                    continue;
+                }
+                
+                p.vy = Math.min(p.vy + this.config.gravity, this.config.terminalVelocity);
+                p.y += p.vy;
+                this.resolveCollisions(p, 'y');
+                p.x += p.vx;
+                this.resolveCollisions(p, 'x');
+
+                if (p.y > 800) this.killPlayer(p);
+
+                // Laser collision check
+                const activeLasers = this.state.entities.filter(e => e.type === 'laser' && e.active);
+                activeLasers.forEach(laser => {
+                    if (this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, laser)) {
+                        this.killPlayer(p);
+                    }
+                });
+            }
+        }
+
+        // Verify level completion after sub-steps
         let playersFinished = 0;
         const activeCount = Object.keys(this.state.players).length;
-
-        for (let id in this.state.players) {
-            const p = this.state.players[id];
-            if (p.isDead) {
-                if (typeof p.respawnTimer === 'number') {
-                    p.respawnTimer -= dt;
-                    if (p.respawnTimer <= 0) {
-                        p.isDead = false;
-                        p.respawnTimer = null;
-                    }
+        const exitDoor = this.state.entities.find(e => e.id === 'door1');
+        if (exitDoor && !exitDoor.locked) {
+            for (let id in this.state.players) {
+                const p = this.state.players[id];
+                if (!p.isDead && this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, exitDoor)) {
+                    playersFinished++;
                 }
-                continue;
-            }
-            
-            p.vy = Math.min(p.vy + this.config.gravity, this.config.terminalVelocity);
-            p.y += p.vy;
-            this.resolveCollisions(p, 'y');
-            p.x += p.vx;
-            this.resolveCollisions(p, 'x');
-
-            if (p.y > 800) this.killPlayer(p);
-
-            // Laser collision check
-            const activeLasers = this.state.entities.filter(e => e.type === 'laser' && e.active);
-            activeLasers.forEach(laser => {
-                if (this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, laser)) {
-                    this.killPlayer(p);
-                }
-            });
-
-            // Exit Door Overlap Logic
-            const exitDoor = this.state.entities.find(e => e.id === 'door1');
-            if (exitDoor && !exitDoor.locked && this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, exitDoor)) {
-                playersFinished++;
             }
         }
 
@@ -329,9 +339,7 @@ const engine = {
         }
 
         this.updateCamera();
-        
-        // Sync public state to client
-        if (this.state.tick % 2 === 0) this.sync();
+        this.sync();
     },
 
     completeLevel: function() {

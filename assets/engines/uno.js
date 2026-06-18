@@ -299,12 +299,23 @@ const engine = {
             this.advanceTurn(1);
         } else {
             const card = this.drawOne(player.id);
+            if (!card) {
+                console.log("No cards left to draw.");
+                this.advanceTurn(1);
+                this.resetTurnTimer();
+                this.sync();
+                return;
+            }
             console.log("Player " + player.id + " drew normal card: " + card.color + " " + card.value);
 
             if (this.state.settings.drawUntilPlayable) {
                 let playable = this.isPlayable(card);
                 while (!playable) {
                     const next = this.drawOne(player.id);
+                    if (!next) {
+                        console.log("No cards left to draw during drawUntilPlayable loop.");
+                        break;
+                    }
                     playable = this.isPlayable(next);
                     console.log("Drew extra card: " + next.color + " " + next.value + " (playable=" + playable + ")");
                 }
