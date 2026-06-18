@@ -9,5 +9,120 @@
   "maxPlayers": 8,
   "permissions": ["private-state", "timers", "persistent-storage"],
   "entry": "index.html",
-  "thumbnail": "thumbnail.png"
+  "thumbnail": "thumbnail.png",
+  "settingsSchema": {
+    "preset": {
+      "type": "select",
+      "label": "Rule Presets",
+      "description": "Select a configuration archetype",
+      "default": "classic",
+      "options": [
+        {"value": "classic", "label": "Classic UNO (Official Rules)"},
+        {"value": "family", "label": "Family Mode (Cooperative)"},
+        {"value": "chaos", "label": "Chaos Mode (Insane Actions)"},
+        {"value": "tournament", "label": "Tournament Mode (Timed)"}
+      ],
+      "values": {
+        "classic": {
+          "startingHandSize": 7,
+          "scoreLimit": 500,
+          "turnTimer": 0,
+          "stacking": false,
+          "jumpIn": false,
+          "sevenZero": false,
+          "forcePlay": false,
+          "drawUntilPlayable": false
+        },
+        "family": {
+          "startingHandSize": 7,
+          "scoreLimit": 500,
+          "turnTimer": 0,
+          "stacking": true,
+          "jumpIn": true,
+          "sevenZero": false,
+          "forcePlay": true,
+          "drawUntilPlayable": false
+        },
+        "chaos": {
+          "startingHandSize": 10,
+          "scoreLimit": 500,
+          "turnTimer": 15,
+          "stacking": true,
+          "jumpIn": true,
+          "sevenZero": true,
+          "forcePlay": true,
+          "drawUntilPlayable": true
+        },
+        "tournament": {
+          "startingHandSize": 7,
+          "scoreLimit": 500,
+          "turnTimer": 10,
+          "stacking": false,
+          "jumpIn": false,
+          "sevenZero": false,
+          "forcePlay": true,
+          "drawUntilPlayable": false
+        }
+      }
+    },
+    "startingHandSize": {
+      "type": "number",
+      "label": "Starting Hand Size",
+      "description": "Cards dealt per player (2 - 15)",
+      "default": 7,
+      "min": 2,
+      "max": 15
+    },
+    "scoreLimit": {
+      "type": "number",
+      "label": "Score Limit",
+      "description": "Points to win the game (100 - 2000)",
+      "default": 500,
+      "min": 100,
+      "max": 2000
+    },
+    "turnTimer": {
+      "type": "select",
+      "label": "Turn Timer",
+      "description": "Seconds per turn (0 = disabled)",
+      "default": 0,
+      "options": [
+        {"value": 0, "label": "Disabled"},
+        {"value": 10, "label": "10 Seconds"},
+        {"value": 15, "label": "15 Seconds"},
+        {"value": 30, "label": "30 Seconds"},
+        {"value": 60, "label": "60 Seconds"}
+      ]
+    },
+    "stacking": {
+      "type": "boolean",
+      "label": "Penalty Stacking",
+      "description": "Allows stacking +2/+4 cards",
+      "default": true
+    },
+    "jumpIn": {
+      "type": "boolean",
+      "label": "Jump-In Rule",
+      "description": "Play exact matches out of turn",
+      "default": false
+    },
+    "sevenZero": {
+      "type": "boolean",
+      "label": "Seven-Zero Rule",
+      "description": "0 rotates hands, 7 swaps hand",
+      "default": false
+    },
+    "forcePlay": {
+      "type": "boolean",
+      "label": "Force Play",
+      "description": "Must play drawn card if playable",
+      "default": false
+    },
+    "drawUntilPlayable": {
+      "type": "boolean",
+      "label": "Draw Until Playable",
+      "description": "Keep drawing until a card can be played",
+      "default": false
+    }
+  }
 }

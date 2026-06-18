@@ -16,6 +16,7 @@ export interface GameManifest {
   minPlayers: number;
   maxPlayers: number;
   thumbnail?: string;
+  settingsSchema?: Record<string, any>;
 }
 
 export type RoomStatus = 'waiting' | 'active' | 'finished';

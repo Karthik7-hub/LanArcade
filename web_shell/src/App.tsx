@@ -7,11 +7,12 @@ import './plugin_runtime/ArcadeSDK'; // Initialize SDK
 import type { GameManifest } from './shared/types';
 
 const App: React.FC = () => {
-  const { isConnected, player, room, setPlayer, publicGameState } = useStore();
+  const { isConnected, player, room, setPlayer, publicGameState, debugLogs, clearDebugLogs, errorAlert, setErrorAlert } = useStore();
   const [nameInput, setNameInput] = useState('');
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [availableGames, setAvailableGames] = useState<GameManifest[]>([]);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     // Initial identity check
@@ -50,177 +51,377 @@ const App: React.FC = () => {
     }
   };
 
-  // --- Connecting Screen ---
-  if (!isConnected) {
+  const handleUpdateSetting = (key: string, value: any) => {
+    if (!room || !player || player.id !== room.hostId) return;
+    const currentSettings = room.settings || {};
+    const newSettings = { ...currentSettings, [key]: value };
+    
+    // Auto-update presets if custom settings are modified
+    if (room.game.settingsSchema && 'preset' in room.game.settingsSchema && key !== 'preset') {
+      newSettings['preset'] = 'custom';
+    }
+    
+    wsClient.send('room.update_settings', { settings: newSettings });
+  };
+
+  const handlePresetChange = (preset: string) => {
+    if (!room || !player || player.id !== room.hostId) return;
+    const schemaPreset = room.game.settingsSchema?.preset;
+    let presetSettings: Record<string, any> = { preset };
+    if (schemaPreset && schemaPreset.values && schemaPreset.values[preset]) {
+      presetSettings = {
+        ...presetSettings,
+        ...schemaPreset.values[preset]
+      };
+    } else {
+      presetSettings = { ...room.settings, preset };
+    }
+    wsClient.send('room.update_settings', { settings: presetSettings });
+  };
+
+  // --- Render content based on connection / status ---
+  const renderView = () => {
+    if (!isConnected) {
+      return (
+        <div style={styles.fullScreen}>
+          <div style={styles.centerColumn}>
+            <div style={styles.spinner}></div>
+            <p style={styles.connectingText}>CONNECTING TO ARCADE...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!player) {
+      return (
+        <div style={styles.fullScreen}>
+          <div style={styles.identityCard}>
+            <img src="/logo.png" alt="LAN Arcade Logo" style={{ width: 140, height: 140, marginBottom: 16, objectFit: 'contain' }} />
+            <h1 style={styles.heroTitle}>LAN ARCADE</h1>
+            <p style={styles.subtitle}>Ready to play? Enter your name below.</p>
+
+            <div style={styles.inputGroup}>
+              <input
+                type="text"
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleJoinPlatform()}
+                placeholder="Enter Username"
+                style={styles.input}
+              />
+              <button onClick={handleJoinPlatform} style={styles.primaryButton}>
+                JOIN PLATFORM
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!room) {
+      return (
+        <div style={styles.fullScreen}>
+          <div style={styles.lobbyContainer}>
+            <header style={styles.lobbyHeader}>
+              <div>
+                <h1 style={styles.lobbyTitle}>ARCADE LOBBY</h1>
+                <p style={styles.subtitle}>Hey {player.name}, what's the plan?</p>
+              </div>
+              <div style={styles.avatar}>
+                {player.name[0].toUpperCase()}
+              </div>
+            </header>
+
+            {/* Game Selection */}
+            <div style={styles.sectionTitle}>SELECT A GAME</div>
+            <div style={styles.gameGrid}>
+              {availableGames.map(game => (
+                <button
+                  key={game.id}
+                  onClick={() => handleCreateRoom(game.id)}
+                  style={{
+                    ...styles.gameCard,
+                    ...(selectedGame === game.id ? styles.gameCardSelected : {}),
+                  }}
+                  onMouseEnter={() => setSelectedGame(game.id)}
+                  onMouseLeave={() => setSelectedGame(null)}
+                >
+                  <div style={styles.gameCardIcon}>🎮</div>
+                  <div style={styles.gameCardName}>{game.name}</div>
+                  <div style={styles.gameCardPlayers}>
+                    {game.minPlayers}-{game.maxPlayers} players
+                  </div>
+                </button>
+              ))}
+              {availableGames.length === 0 && (
+                <div style={styles.emptyState}>No games available. Start the server first.</div>
+              )}
+            </div>
+
+            {/* Join with Code */}
+            <div style={{ ...styles.card, marginTop: 24 }}>
+              <h2 style={styles.cardTitle}>JOIN WITH CODE</h2>
+              <p style={styles.cardSubtitle}>Enter the code shown on the host device.</p>
+              <div style={styles.joinRow}>
+                <input
+                  type="text"
+                  value={roomCodeInput}
+                  onChange={e => setRoomCodeInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleJoinRoom()}
+                  placeholder="CODE"
+                  style={styles.codeInput}
+                  maxLength={4}
+                />
+                <button onClick={handleJoinRoom} style={styles.joinButton}>
+                  JOIN
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (room.status !== 'waiting' && publicGameState) {
+      return <GameLoader />;
+    }
+
     return (
       <div style={styles.fullScreen}>
-        <div style={styles.centerColumn}>
-          <div style={styles.spinner}></div>
-          <p style={styles.connectingText}>CONNECTING TO ARCADE...</p>
+        <div style={styles.waitingContainer}>
+          <header style={styles.waitingHeader}>
+            <div style={styles.roomInfo}>
+              <div style={styles.roomCode}>{room.code}</div>
+              <h2 style={styles.gameName}>{room.game.name}</h2>
+            </div>
+            <button
+              onClick={() => {
+                wsClient.send('room.leave', {});
+                window.history.replaceState({}, '', window.location.pathname);
+                window.location.reload();
+              }}
+              style={styles.leaveButton}
+            >
+              LEAVE ROOM
+            </button>
+          </header>
+
+          <div style={styles.card}>
+            <div style={styles.playerListHeader}>
+              <h3 style={styles.cardTitle}>PLAYERS IN LOBBY</h3>
+              <span style={styles.playerCount}>
+                {room.players.length} / {room.game.maxPlayers}
+              </span>
+            </div>
+            <ul style={styles.playerList}>
+              {room.players.map(p => (
+                <li key={p.id} style={styles.playerItem}>
+                  <div style={styles.playerAvatar}>
+                    {p.name[0].toUpperCase()}
+                  </div>
+                  <span style={styles.playerName}>{p.name}</span>
+                  {p.id === room.hostId && (
+                    <span style={styles.hostBadge}>HOST</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Room Settings Panel */}
+          <div style={{ ...styles.card, marginTop: 12 }}>
+            <h3 style={styles.cardTitle}><span style={{ marginRight: 6 }}>⚙️</span>ROOM GAME SETTINGS</h3>
+            <p style={styles.cardSubtitle}>
+              {player.id === room.hostId ? 'Configure game presets and house rules below.' : 'View current rules configured by the host.'}
+            </p>
+            
+            <div style={styles.settingsContainer}>
+              {room.game.settingsSchema ? (
+                Object.entries(room.game.settingsSchema).map(([key, def]: [string, any]) => {
+                  // Special check: hide isDailyChallenge if levelType is not 'procedural'
+                  if (key === 'isDailyChallenge' && room.settings?.levelType !== 'procedural') {
+                    return null;
+                  }
+
+                  const value = room.settings?.[key] !== undefined ? room.settings[key] : def.default;
+
+                  return (
+                    <div key={key} style={styles.settingsRow}>
+                      <div>
+                        <div style={styles.settingsLabel}>{def.label || key}</div>
+                        {def.description && (
+                          <div style={styles.settingsDescription}>{def.description}</div>
+                        )}
+                      </div>
+                      {def.type === 'select' && (
+                        <select
+                          value={value}
+                          onChange={e => {
+                            let val: any = e.target.value;
+                            if (def.options && def.options.length > 0 && typeof def.options[0].value === 'number') {
+                              val = Number(val);
+                            }
+                            if (key === 'preset') {
+                              handlePresetChange(val);
+                            } else {
+                              handleUpdateSetting(key, val);
+                            }
+                          }}
+                          disabled={player.id !== room.hostId}
+                          style={styles.selectInput}
+                        >
+                          {def.options?.map((opt: any) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label || opt.value}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {def.type === 'number' && (
+                        <input
+                          type="number"
+                          min={def.min}
+                          max={def.max}
+                          value={value}
+                          onChange={e => {
+                            const val = parseInt(e.target.value);
+                            handleUpdateSetting(key, isNaN(val) ? def.default : val);
+                          }}
+                          disabled={player.id !== room.hostId}
+                          style={styles.numberInput}
+                        />
+                      )}
+                      {def.type === 'boolean' && (
+                        <input
+                          type="checkbox"
+                          checked={!!value}
+                          onChange={e => handleUpdateSetting(key, e.target.checked)}
+                          disabled={player.id !== room.hostId}
+                          style={styles.checkboxInput}
+                        />
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p style={styles.cardSubtitle}>No customizable settings available for this game.</p>
+              )}
+            </div>
+          </div>
+
+          <div style={styles.startSection}>
+            {room.status === 'waiting' && player.id === room.hostId ? (
+              <>
+                <button
+                  onClick={() => wsClient.send('game.action', { type: 'START', data: {} })}
+                  style={styles.startButton}
+                >
+                  START MATCH
+                </button>
+                <p style={styles.waitHint}>Wait for everyone to join before starting!</p>
+              </>
+            ) : (
+              <div style={styles.centerColumn}>
+                <div style={styles.spinner}></div>
+                <p style={styles.waitLabel}>Waiting for host to start...</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
-  }
+  };
 
-  // --- Identity Screen ---
-  if (!player) {
-    return (
-      <div style={styles.fullScreen}>
-        <div style={styles.identityCard}>
-          <img src="/logo.png" alt="LAN Arcade Logo" style={{ width: 140, height: 140, marginBottom: 16, objectFit: 'contain' }} />
-          <h1 style={styles.heroTitle}>LAN ARCADE</h1>
-          <p style={styles.subtitle}>Ready to play? Enter your name below.</p>
-
-          <div style={styles.inputGroup}>
-            <input
-              type="text"
-              value={nameInput}
-              onChange={e => setNameInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleJoinPlatform()}
-              placeholder="Enter Username"
-              style={styles.input}
-            />
-            <button onClick={handleJoinPlatform} style={styles.primaryButton}>
-              JOIN PLATFORM
+  return (
+    <>
+      {errorAlert && (
+        <div style={styles.errorAlertOverlay}>
+          <div style={styles.errorAlertCard}>
+            <div style={styles.errorAlertHeader}>
+              <span style={{ fontSize: 24 }}>⚠️</span>
+              <h4 style={styles.errorAlertTitle}>SYSTEM ALERT</h4>
+            </div>
+            <p style={styles.errorAlertText}>{errorAlert}</p>
+            <button onClick={() => setErrorAlert(null)} style={styles.errorAlertBtn}>
+              DISMISS
             </button>
           </div>
         </div>
-      </div>
-    );
-  }
+      )}
+      {renderView()}
+      
+      {/* Floating Debug Trigger */}
+      {isConnected && (
+        <button onClick={() => setShowDebug(!showDebug)} style={styles.debugToggleBtn}>
+          🐞 {showDebug ? 'CLOSE DEBUG' : 'DEBUG PANEL'}
+        </button>
+      )}
 
-  // --- Lobby Screen ---
-  if (!room) {
-    return (
-      <div style={styles.fullScreen}>
-        <div style={styles.lobbyContainer}>
-          <header style={styles.lobbyHeader}>
-            <div>
-              <h1 style={styles.lobbyTitle}>ARCADE LOBBY</h1>
-              <p style={styles.subtitle}>Hey {player.name}, what's the plan?</p>
+      {/* Floating Debug Panel */}
+      {showDebug && (
+        <div style={styles.debugPanel}>
+          <div style={styles.debugHeader}>
+            <h3 style={styles.debugTitle}>DEVELOPER AUDIT PANEL</h3>
+            <button onClick={() => setShowDebug(false)} style={styles.debugCloseBtn}>×</button>
+          </div>
+          <div style={styles.debugContent}>
+            <div style={styles.debugSection}>
+              <h4 style={styles.debugSecTitle}>System Status</h4>
+              <div>Connection: <span style={{ color: colors.accent, fontWeight: 'bold' }}>CONNECTED</span></div>
+              {player && <div>Player: {player.name} ({player.id.substring(0, 6)}...)</div>}
+              {room && (
+                <>
+                  <div>Room Code: <span style={{ color: colors.secondary, fontWeight: 'bold' }}>{room.code}</span></div>
+                  <div>Status: {room.status.toUpperCase()}</div>
+                  <div>Game: {room.game.name} ({room.game.id})</div>
+                </>
+              )}
             </div>
-            <div style={styles.avatar}>
-              {player.name[0].toUpperCase()}
-            </div>
-          </header>
 
-          {/* Game Selection */}
-          <div style={styles.sectionTitle}>SELECT A GAME</div>
-          <div style={styles.gameGrid}>
-            {availableGames.map(game => (
-              <button
-                key={game.id}
-                onClick={() => handleCreateRoom(game.id)}
-                style={{
-                  ...styles.gameCard,
-                  ...(selectedGame === game.id ? styles.gameCardSelected : {}),
-                }}
-                onMouseEnter={() => setSelectedGame(game.id)}
-                onMouseLeave={() => setSelectedGame(null)}
-              >
-                <div style={styles.gameCardIcon}>🎮</div>
-                <div style={styles.gameCardName}>{game.name}</div>
-                <div style={styles.gameCardPlayers}>
-                  {game.minPlayers}-{game.maxPlayers} players
-                </div>
-              </button>
-            ))}
-            {availableGames.length === 0 && (
-              <div style={styles.emptyState}>No games available. Start the server first.</div>
+            {room && (
+              <div style={styles.debugSection}>
+                <h4 style={styles.debugSecTitle}>Active Settings</h4>
+                <pre style={{ margin: 0, overflowX: 'auto', background: colors.bg, padding: 6, borderRadius: 6 }}>
+                  {JSON.stringify(room.settings, null, 2)}
+                </pre>
+              </div>
             )}
-          </div>
 
-          {/* Join with Code */}
-          <div style={{ ...styles.card, marginTop: 24 }}>
-            <h2 style={styles.cardTitle}>JOIN WITH CODE</h2>
-            <p style={styles.cardSubtitle}>Enter the code shown on the host device.</p>
-            <div style={styles.joinRow}>
-              <input
-                type="text"
-                value={roomCodeInput}
-                onChange={e => setRoomCodeInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleJoinRoom()}
-                placeholder="CODE"
-                style={styles.codeInput}
-                maxLength={4}
-              />
-              <button onClick={handleJoinRoom} style={styles.joinButton}>
-                JOIN
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+            {publicGameState && (
+              <div style={styles.debugSection}>
+                <h4 style={styles.debugSecTitle}>Public Game State</h4>
+                <pre style={{ margin: 0, overflowX: 'auto', maxHeight: 150, overflowY: 'auto', background: colors.bg, padding: 6, borderRadius: 6 }}>
+                  {JSON.stringify(publicGameState, null, 2)}
+                </pre>
+              </div>
+            )}
 
-  // --- In-Game View ---
-  if (room.status !== 'waiting' && publicGameState) {
-    return <GameLoader />;
-  }
-
-  // --- Waiting Room ---
-  return (
-    <div style={styles.fullScreen}>
-      <div style={styles.waitingContainer}>
-        <header style={styles.waitingHeader}>
-          <div style={styles.roomInfo}>
-            <div style={styles.roomCode}>{room.code}</div>
-            <h2 style={styles.gameName}>{room.game.name}</h2>
-          </div>
-          <button
-            onClick={() => {
-              window.history.replaceState({}, '', window.location.pathname);
-              window.location.reload();
-            }}
-            style={styles.leaveButton}
-          >
-            LEAVE ROOM
-          </button>
-        </header>
-
-        <div style={styles.card}>
-          <div style={styles.playerListHeader}>
-            <h3 style={styles.cardTitle}>PLAYERS IN LOBBY</h3>
-            <span style={styles.playerCount}>
-              {room.players.length} / {room.game.maxPlayers}
-            </span>
-          </div>
-          <ul style={styles.playerList}>
-            {room.players.map(p => (
-              <li key={p.id} style={styles.playerItem}>
-                <div style={styles.playerAvatar}>
-                  {p.name[0].toUpperCase()}
-                </div>
-                <span style={styles.playerName}>{p.name}</span>
-                {p.id === room.hostId && (
-                  <span style={styles.hostBadge}>HOST</span>
+            <div style={{ ...styles.debugSection, flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h4 style={{ ...styles.debugSecTitle, margin: 0 }}>WebSocket Event Log</h4>
+                <button onClick={clearDebugLogs} style={{ background: 'none', border: 'none', color: colors.danger, cursor: 'pointer', fontSize: 10, fontWeight: 'bold' }}>CLEAR</button>
+              </div>
+              <div style={styles.debugConsole}>
+                {debugLogs.length === 0 ? (
+                  <div style={{ color: colors.textMuted, fontStyle: 'italic' }}>No events recorded.</div>
+                ) : (
+                  debugLogs.map((log, index) => {
+                    const isOut = log.startsWith('→');
+                    const color = isOut ? colors.secondary : colors.accent;
+                    return (
+                      <div key={index} style={styles.debugLogLine}>
+                        <span style={{ color }}>{log.substring(0, 6)}</span>
+                        {log.substring(6)}
+                      </div>
+                    );
+                  })
                 )}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div style={styles.startSection}>
-          {room.status === 'waiting' && player.id === room.hostId ? (
-            <>
-              <button
-                onClick={() => wsClient.send('game.action', { type: 'START', data: {} })}
-                style={styles.startButton}
-              >
-                START MATCH
-              </button>
-              <p style={styles.waitHint}>Wait for everyone to join before starting!</p>
-            </>
-          ) : (
-            <div style={styles.centerColumn}>
-              <div style={styles.spinner}></div>
-              <p style={styles.waitLabel}>Waiting for host to start...</p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 
@@ -582,6 +783,201 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
     letterSpacing: 2,
     fontSize: 12,
+  },
+  settingsContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 12,
+    marginTop: 12,
+  },
+  settingsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 0',
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  settingsLabel: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: colors.text,
+  },
+  settingsDescription: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  selectInput: {
+    background: colors.bg,
+    color: colors.text,
+    border: `2px solid ${colors.surface}`,
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 13,
+    fontWeight: 700,
+    outline: 'none',
+  },
+  numberInput: {
+    background: colors.bg,
+    color: colors.text,
+    border: `2px solid ${colors.surface}`,
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 13,
+    fontWeight: 700,
+    width: 70,
+    textAlign: 'center' as const,
+    outline: 'none',
+  },
+  checkboxInput: {
+    width: 18,
+    height: 18,
+    cursor: 'pointer',
+  },
+  debugToggleBtn: {
+    position: 'fixed' as const,
+    bottom: 20,
+    left: 20,
+    zIndex: 10000,
+    background: '#1e293b',
+    border: '2px solid rgba(255,255,255,0.2)',
+    borderRadius: 30,
+    padding: '8px 16px',
+    color: '#fbbf24',
+    fontWeight: 800,
+    fontSize: 12,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+    letterSpacing: 1,
+  },
+  debugPanel: {
+    position: 'fixed' as const,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 360,
+    background: 'rgba(15, 23, 42, 0.95)',
+    backdropFilter: 'blur(16px)',
+    borderLeft: '2px solid rgba(255,255,255,0.1)',
+    zIndex: 9999,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    color: '#fff',
+    boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+  },
+  debugHeader: {
+    padding: '16px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  debugTitle: {
+    margin: 0,
+    fontSize: 14,
+    fontWeight: 900,
+    letterSpacing: 2,
+    color: '#fbbf24',
+  },
+  debugCloseBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#94a3b8',
+    fontSize: 20,
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  debugContent: {
+    flex: 1,
+    overflowY: 'auto' as const,
+    padding: 20,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 16,
+    fontSize: 12,
+  },
+  debugSection: {
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.05)',
+    padding: 12,
+  },
+  debugSecTitle: {
+    margin: '0 0 8px 0',
+    fontSize: 11,
+    fontWeight: 800,
+    color: '#3b82f6',
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+  },
+  debugConsole: {
+    background: '#020617',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    padding: 8,
+    fontFamily: 'monospace',
+    maxHeight: 180,
+    overflowY: 'auto' as const,
+    whiteSpace: 'pre-wrap' as const,
+  },
+  debugLogLine: {
+    margin: '0 0 4px 0',
+    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    paddingBottom: 2,
+  },
+  errorAlertOverlay: {
+    position: 'fixed' as const,
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    backdropFilter: 'blur(8px)',
+  },
+  errorAlertCard: {
+    backgroundColor: '#0f172a',
+    border: '2px solid #ef4444',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 360,
+    boxShadow: '0 10px 30px rgba(239, 68, 68, 0.25)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    textAlign: 'center' as const,
+  },
+  errorAlertHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  errorAlertTitle: {
+    margin: 0,
+    color: '#ef4444',
+    fontWeight: 800,
+    fontSize: 18,
+    letterSpacing: 2,
+  },
+  errorAlertText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    lineHeight: 1.5,
+    marginBottom: 24,
+  },
+  errorAlertBtn: {
+    backgroundColor: '#ef4444',
+    border: 'none',
+    color: '#fff',
+    padding: '12px 24px',
+    borderRadius: 14,
+    fontWeight: 800,
+    fontSize: 14,
+    cursor: 'pointer',
+    width: '100%',
+    transition: 'background 0.2s',
   },
 };
 

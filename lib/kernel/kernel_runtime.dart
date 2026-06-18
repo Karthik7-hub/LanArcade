@@ -29,6 +29,7 @@ class KernelRuntime {
   final ConnectionManager connectionManager = ConnectionManager();
   final Map<String, JsEngine> activeEngines = {};
   final Map<String, models.Room> roomData = {};
+  final Map<String, Timer> _cleanupTimers = {};
   final Uuid _uuid = const Uuid();
 
   HttpServer? _server;
@@ -93,12 +94,24 @@ class KernelRuntime {
         (Request request, String gameId, String file) async {
       final root = shellAssetsPath.replaceAll('shell_assets', '');
       final gamePath = p.join(root, 'game_assets', gameId);
-      final fileToServe = File(p.join(gamePath, 'index.html'));
+      final filePath = (file.isEmpty || file == '/') ? 'index.html' : file;
+      final fileToServe = File(p.join(gamePath, filePath));
       if (!await fileToServe.exists()) {
-        return Response.notFound('Game assets not found');
+        return Response.notFound('File not found');
       }
       final bytes = await fileToServe.readAsBytes();
-      return Response.ok(bytes, headers: {'content-type': 'text/html'});
+      
+      String contentType = 'text/html';
+      if (filePath.endsWith('.css')) {
+        contentType = 'text/css';
+      } else if (filePath.endsWith('.js')) {
+        contentType = 'application/javascript';
+      } else if (filePath.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (filePath.endsWith('.json')) {
+        contentType = 'application/json';
+      }
+      return Response.ok(bytes, headers: {'content-type': contentType});
     });
 
     // WebSocket Handler
@@ -178,6 +191,12 @@ class KernelRuntime {
     activeEngines.clear();
     roomData.clear();
 
+    // Cancel all cleanup timers
+    for (final timer in _cleanupTimers.values) {
+      timer.cancel();
+    }
+    _cleanupTimers.clear();
+
     await _server?.close(force: true);
     _server = null;
     _isRunning = false;
@@ -213,8 +232,20 @@ class KernelRuntime {
         // Enforce max players at creation (min 1 = the host)
         await AssetExtractor.extractGameAssets(manifest.id);
 
+        final initialSettings = <String, dynamic>{};
+        if (manifest.settingsSchema != null) {
+          manifest.settingsSchema!.forEach((key, value) {
+            if (value is Map && value.containsKey('default')) {
+              initialSettings[key] = value['default'];
+            }
+          });
+        }
+        if (payload['settings'] is Map) {
+          initialSettings.addAll(Map<String, dynamic>.from(payload['settings'] as Map));
+        }
+
         final room = await roomService.createRoom(
-            manifest, connection.player!, payload['settings'] ?? {});
+            manifest, connection.player!, initialSettings);
         if (room != null) {
           connection.roomId = room.id;
           roomData[room.id] = room;
@@ -269,13 +300,18 @@ class KernelRuntime {
         if (roomId.isNotEmpty) {
           final room = roomData[roomId]!;
 
-          // Enforce maxPlayers
-          if (room.players.length >= room.game.maxPlayers) {
+          // Enforce maxPlayers only for new players (bypass if reconnecting)
+          final isAlreadyInRoom = room.players.any((p) => p.id == connection.player!.id);
+          if (!isAlreadyInRoom && room.players.length >= room.game.maxPlayers) {
             connection.send('system.error', 'Room is full');
             return;
           }
 
-          if (!room.players.any((p) => p.id == connection.player!.id)) {
+          // Cancel any pending cleanup timers for this room since a player has rejoined
+          _cleanupTimers[roomId]?.cancel();
+          _cleanupTimers.remove(roomId);
+
+          if (!isAlreadyInRoom) {
             room.players.add(connection.player!);
             await roomService.updatePlayers(roomId, room.players);
           }
@@ -291,6 +327,28 @@ class KernelRuntime {
         }
         break;
 
+      case 'room.update_settings':
+        if (connection.roomId == null || connection.player == null) return;
+        final roomId = connection.roomId!;
+        final room = roomData[roomId];
+        if (room != null && connection.player!.id == room.hostId) {
+          final settings = Map<String, dynamic>.from(payload['settings'] as Map? ?? {});
+          final updatedRoom = room.copyWith(settings: settings);
+          roomData[roomId] = updatedRoom;
+          await roomService.updateSettings(roomId, settings);
+          connectionManager.broadcastToRoom(
+              roomId, 'room.update', updatedRoom.toJson());
+        }
+        break;
+
+      case 'room.leave':
+        if (connection.roomId == null || connection.player == null) return;
+        final roomId = connection.roomId!;
+        await _handlePlayerLeaveRoom(roomId, connection.player!);
+        connection.roomId = null;
+        connection.send('room.update', null);
+        break;
+
       case 'game.action':
         if (connection.roomId == null || connection.player == null) return;
         final engine = activeEngines[connection.roomId];
@@ -304,8 +362,11 @@ class KernelRuntime {
             roomData[roomId] = updatedRoom;
             engine.init(updatedRoom.settings, updatedRoom.players);
             await roomService.updateStatus(roomId, models.RoomStatus.active);
+            
+            // Retrieve latest room from cache which contains the updated publicGameState
+            final finalRoom = roomData[roomId] ?? updatedRoom;
             connectionManager.broadcastToRoom(
-                roomId, 'room.update', updatedRoom.toJson());
+                roomId, 'room.update', finalRoom.toJson());
           }
         } else if (payload['type'] == 'UNLOCK_ACHIEVEMENT') {
           final aid = payload['data']['achievementId'] as String;
@@ -337,10 +398,27 @@ class KernelRuntime {
     if (connection != null &&
         connection.roomId != null &&
         connection.player != null) {
-      final engine = activeEngines[connection.roomId!];
+      final roomId = connection.roomId!;
+      final engine = activeEngines[roomId];
       engine?.playerLeft(connection.player!);
+
+      connectionManager.removeConnection(connectionId);
+      final remaining = connectionManager.getActiveConnectionsCount(roomId);
+      if (remaining == 0) {
+        _log.info('Room $roomId has 0 active players. Starting 60s cleanup timer.');
+        _cleanupTimers[roomId]?.cancel();
+        _cleanupTimers[roomId] = Timer(const Duration(seconds: 60), () async {
+          _cleanupTimers.remove(roomId);
+          final currentRemaining = connectionManager.getActiveConnectionsCount(roomId);
+          if (currentRemaining == 0) {
+            _log.info('Room $roomId cleanup timer expired. Destroying room.');
+            await _destroyRoom(roomId);
+          }
+        });
+      }
+    } else {
+      connectionManager.removeConnection(connectionId);
     }
-    connectionManager.removeConnection(connectionId);
     _statsController.add({
       'log': 'WS_CLOSED: $connectionId',
       'activeConnections': connectionManager.activeCount,
@@ -441,6 +519,46 @@ class KernelRuntime {
       }
     } catch (e) {
       _statsController.add({'log': 'Recovery failed: $e'});
+    }
+  }
+
+  Future<void> _handlePlayerLeaveRoom(String roomId, models.Player player) async {
+    final room = roomData[roomId];
+    if (room == null) return;
+
+    room.players.removeWhere((p) => p.id == player.id);
+    final engine = activeEngines[roomId];
+    if (engine != null) {
+      engine.playerLeft(player);
+    }
+
+    if (room.players.isEmpty) {
+      _cleanupTimers[roomId]?.cancel();
+      _cleanupTimers.remove(roomId);
+      await _destroyRoom(roomId);
+    } else {
+      var updatedRoom = room.copyWith(players: room.players);
+      if (room.hostId == player.id) {
+        final newHost = room.players.first;
+        updatedRoom = updatedRoom.copyWith(hostId: newHost.id);
+        await roomService.updateHost(roomId, newHost.id);
+      }
+      roomData[roomId] = updatedRoom;
+      await roomService.updatePlayers(roomId, updatedRoom.players);
+      connectionManager.broadcastToRoom(roomId, 'room.update', updatedRoom.toJson());
+    }
+  }
+
+  Future<void> _destroyRoom(String roomId) async {
+    final engine = activeEngines.remove(roomId);
+    if (engine != null) {
+      _log.info('Disposing JsEngine for room $roomId');
+      engine.dispose();
+    }
+    final room = roomData.remove(roomId);
+    if (room != null) {
+      _log.info('Destroying room ${room.code}');
+      await roomService.updateStatus(roomId, models.RoomStatus.finished);
     }
   }
 

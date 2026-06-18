@@ -39,6 +39,7 @@
             gap: 12px;
             padding: 12px;
             flex-wrap: wrap;
+            margin-top: 48px;
         }
         .opponent { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .opponent .avatar {
@@ -109,20 +110,27 @@
         }
         .draw-pile:active { transform: scale(0.95); background: #334155; }
 
-        /* Color Picker */
-        #color-picker {
+        /* Overlay Pickers */
+        #color-picker, #swap-picker {
             position: absolute; inset: 0; background: rgba(0,0,0,0.92);
             display: none; grid-template-columns: 1fr 1fr; gap: 16px;
             padding: 40px; place-items: center; z-index: 1000;
             align-content: center;
         }
-        #color-picker h3 {
+        #swap-picker {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #color-picker h3, #swap-picker h3 {
             grid-column: 1 / -1;
             font-size: 18px;
             font-weight: 800;
             text-align: center;
             color: #94a3b8;
             letter-spacing: 2px;
+            margin-bottom: 16px;
         }
         .color-btn {
             width: 80px; height: 80px; border-radius: 20px;
@@ -134,7 +142,15 @@
         .color-btn.Red { background: var(--red); } .color-btn.Blue { background: var(--blue); }
         .color-btn.Green { background: var(--green); } .color-btn.Yellow { background: var(--yellow); }
 
-        /* Status bar */
+        .swap-btn {
+            padding: 14px 28px; background: #1e293b; border: 2px solid #475569;
+            border-radius: 16px; color: #fff; font-weight: 800; cursor: pointer;
+            min-width: 200px; text-align: center; font-size: 16px;
+            transition: all 0.2s ease;
+        }
+        .swap-btn:active { transform: scale(0.95); background: #334155; }
+
+        /* Status bar & Badges */
         .status-bar {
             position: absolute;
             top: 0; left: 0; right: 0;
@@ -169,10 +185,60 @@
         }
         #winner-overlay h2 { font-size: 32px; }
         #winner-overlay p { color: #94a3b8; font-size: 18px; }
+
+        /* Floating Action Buttons */
+        #uno-actions {
+            position: absolute;
+            bottom: 150px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 200;
+        }
+        .action-btn {
+            padding: 12px 24px;
+            border-radius: 50px;
+            border: 3px solid #fff;
+            color: #fff;
+            font-weight: 900;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .action-btn.declare {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            border-color: #fca5a5;
+        }
+        .action-btn.declare:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+        }
+        .action-btn.catch {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-color: #fde68a;
+        }
+        .action-btn.catch:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.7);
+        }
     </style>
 </head>
 <body>
     <div id="game-container">
+        <!-- Badge row -->
+        <div style="position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; flex-direction: column; gap: 4px;">
+            <div class="status-badge" id="round-indicator">ROUND 1</div>
+        </div>
+        
+        <div style="position: absolute; top: 12px; right: 12px; z-index: 20; display: flex; flex-direction: column; gap: 4px;">
+            <div class="status-badge" id="timer-indicator" style="display: none;">⏳ 0s</div>
+        </div>
+
         <div class="status-bar">
             <div class="status-badge" id="turn-status">WAITING...</div>
         </div>
@@ -181,21 +247,27 @@
         
         <div class="table" id="table">
             <div class="center-pile">
-                <div id="draw-pile" class="draw-pile" ontouchstart="draw()" onclick="draw()">UNO</div>
+                <div id="draw-pile" class="draw-pile" onclick="draw()">UNO</div>
                 <div id="discard-anchor" style="position: relative; width: 70px; height: 105px;"></div>
             </div>
         </div>
 
         <div class="player-hand" id="player-hand"></div>
         <div class="turn-indicator" id="turn-indicator"></div>
+        <div id="uno-actions"></div>
     </div>
 
     <div id="color-picker">
         <h3>CHOOSE COLOR</h3>
-        <div class="color-btn Red" ontouchstart="chooseColor('Red')" onclick="chooseColor('Red')"></div>
-        <div class="color-btn Blue" ontouchstart="chooseColor('Blue')" onclick="chooseColor('Blue')"></div>
-        <div class="color-btn Green" ontouchstart="chooseColor('Green')" onclick="chooseColor('Green')"></div>
-        <div class="color-btn Yellow" ontouchstart="chooseColor('Yellow')" onclick="chooseColor('Yellow')"></div>
+        <div class="color-btn Red" onclick="chooseColor('Red')"></div>
+        <div class="color-btn Blue" onclick="chooseColor('Blue')"></div>
+        <div class="color-btn Green" onclick="chooseColor('Green')"></div>
+        <div class="color-btn Yellow" onclick="chooseColor('Yellow')"></div>
+    </div>
+
+    <div id="swap-picker">
+        <h3>SELECT PLAYER TO SWAP HANDS WITH</h3>
+        <div id="swap-buttons-container" style="display: flex; flex-direction: column; gap: 10px;"></div>
     </div>
 
     <div id="winner-overlay">
@@ -244,23 +316,46 @@
                 return;
             }
 
-            // 1. Update Opponents
+            const scores = publicState.scores || {};
+            const cardCounts = publicState.playerCardCounts || {};
+
+            // 1. Update Round & Score Badges
+            document.getElementById('round-indicator').innerHTML = `ROUND ${publicState.round || 1}<br><span style="font-size: 10px; color: #3b82f6;">MY SCORE: ${scores[player.id] || 0} pts</span>`;
+
+            // 2. Update Turn Timer
+            const timerEl = document.getElementById('timer-indicator');
+            if (publicState.turnTimer > 0 && publicState.timerRemaining > 0 && publicState.status === 'active') {
+                timerEl.style.display = 'block';
+                timerEl.textContent = '⏳ ' + Math.ceil(publicState.timerRemaining) + 's';
+                if (publicState.timerRemaining <= 5) {
+                    timerEl.style.borderColor = '#ef4444';
+                    timerEl.style.color = '#ef4444';
+                    timerEl.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.4)';
+                } else {
+                    timerEl.style.borderColor = 'rgba(255,255,255,0.1)';
+                    timerEl.style.color = '#94a3b8';
+                    timerEl.style.boxShadow = 'none';
+                }
+            } else {
+                timerEl.style.display = 'none';
+            }
+
+            // 3. Update Opponents
             const oppLayer = document.getElementById('opponents-layer');
             oppLayer.innerHTML = '';
             const others = room.players.filter(p => p.id !== player.id);
-            const cardCounts = publicState.playerCardCounts || {};
             others.forEach((opp) => {
                 const div = document.createElement('div');
                 div.className = `opponent ${publicState.currentPlayerId === opp.id ? 'active' : ''}`;
                 div.innerHTML = `
                     <div class="avatar">${opp.name[0]}</div>
                     <div class="name">${opp.name}</div>
-                    <div class="count">🎴 ${cardCounts[opp.id] || 0}</div>
+                    <div class="count">🎴 ${cardCounts[opp.id] || 0} | 🏆 ${scores[opp.id] || 0} pts</div>
                 `;
                 oppLayer.appendChild(div);
             });
 
-            // 2. Update Discard Pile
+            // 4. Update Discard Pile
             const anchor = document.getElementById('discard-anchor');
             anchor.innerHTML = '';
             if (publicState.topCard) {
@@ -268,7 +363,7 @@
                 anchor.appendChild(topCard);
             }
 
-            // 3. Update Hand
+            // 5. Update Hand
             const handEl = document.getElementById('player-hand');
             handEl.innerHTML = '';
             if (privateState && privateState.hand) {
@@ -278,20 +373,17 @@
                     cardBtn.style.zIndex = String(i);
                     const ui = createCardUI(card);
                     
-                    // Use both click and touchstart for responsiveness
-                    const handler = (e) => {
+                    ui.onclick = (e) => {
                         e.preventDefault();
                         playCard(i);
                     };
-                    ui.addEventListener('click', handler);
-                    ui.addEventListener('touchend', handler, { passive: false });
                     
                     cardBtn.appendChild(ui);
                     handEl.appendChild(cardBtn);
                 });
             }
 
-            // 4. Update Turn Status
+            // 6. Update Turn Status
             const isMyTurn = publicState.currentPlayerId === player.id;
             const statusEl = document.getElementById('turn-status');
             if (isMyTurn) {
@@ -309,28 +401,103 @@
             if (publicState.drawPending > 0) {
                 statusEl.textContent += ` (+${publicState.drawPending} STACKED)`;
             }
+
+            // 7. Update UNO actions (Say UNO / Catch UNO)
+            const actionsEl = document.getElementById('uno-actions');
+            actionsEl.innerHTML = '';
+
+            const myCardCount = privateState && privateState.hand ? privateState.hand.length : 0;
+            const unoDeclared = publicState.unoDeclared || {};
+
+            if (myCardCount === 1 && !unoDeclared[player.id]) {
+                const btn = document.createElement('button');
+                btn.className = 'action-btn declare';
+                btn.textContent = 'Say UNO! 📣';
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    safeAction('DECLARE_UNO', {});
+                };
+                actionsEl.appendChild(btn);
+            }
+
+            const uncaughtOpps = room.players.filter(p => p.id !== player.id && cardCounts[p.id] === 1 && !unoDeclared[p.id]);
+            uncaughtOpps.forEach(opp => {
+                const btn = document.createElement('button');
+                btn.className = 'action-btn catch';
+                btn.textContent = `Catch ${opp.name}! 🎴`;
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    safeAction('CATCH_UNO', { targetId: opp.id });
+                };
+                actionsEl.appendChild(btn);
+            });
+        }
+
+        let lastActionTime = 0;
+        function safeAction(name, payload) {
+            const now = Date.now();
+            if (now - lastActionTime < 300) return;
+            lastActionTime = now;
+            Arcade.sendAction(name, payload);
         }
 
         function playCard(idx) {
             const privateState = Arcade.getPrivateState();
             if (!privateState || !privateState.hand) return;
             const card = privateState.hand[idx];
+            
+            const publicState = Arcade.getPublicState();
+            const isSevenZero = publicState && publicState.settings && publicState.settings.sevenZero;
+
             if (card.color === 'Wild') {
                 pendingCardIdx = idx;
                 document.getElementById('color-picker').style.display = 'grid';
+            } else if (card.value === '7' && isSevenZero) {
+                pendingCardIdx = idx;
+                showSwapPlayerPicker();
             } else {
-                Arcade.sendAction('PLAY_CARD', { cardIndex: idx });
+                safeAction('PLAY_CARD', { cardIndex: idx });
             }
         }
 
         function chooseColor(color) {
-            Arcade.sendAction('PLAY_CARD', { cardIndex: pendingCardIdx, chosenColor: color });
+            safeAction('PLAY_CARD', { cardIndex: pendingCardIdx, chosenColor: color });
             document.getElementById('color-picker').style.display = 'none';
             pendingCardIdx = null;
         }
 
+        function showSwapPlayerPicker() {
+            const room = Arcade.getRoom();
+            const player = Arcade.getPlayer();
+            const container = document.getElementById('swap-buttons-container');
+            container.innerHTML = '';
+
+            const others = room.players.filter(p => p.id !== player.id);
+            if (others.length === 0) {
+                // If single player (debugging/bots?), play card immediately without swap UI
+                safeAction('PLAY_CARD', { cardIndex: pendingCardIdx });
+                pendingCardIdx = null;
+                return;
+            }
+
+            others.forEach(other => {
+                const btn = document.createElement('button');
+                btn.className = 'swap-btn';
+                btn.textContent = other.name.toUpperCase();
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    safeAction('PLAY_CARD', { cardIndex: pendingCardIdx, swapPlayerId: other.id });
+                    document.getElementById('swap-picker').style.display = 'none';
+                    pendingCardIdx = null;
+                };
+                container.appendChild(btn);
+            });
+
+            document.getElementById('swap-picker').style.display = 'flex';
+        }
+
         function draw() {
-            Arcade.sendAction('DRAW_CARD', {});
+            safeAction('DRAW_CARD', {});
         }
 
         Arcade.onUpdate(updateUI);

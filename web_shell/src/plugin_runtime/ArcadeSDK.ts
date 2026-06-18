@@ -22,7 +22,14 @@ export const ArcadeSDK = {
     },
 
     onUpdate: (callback: () => void) => {
-        return useStore.subscribe(callback);
+        const unsubscribe = useStore.subscribe(callback);
+        const iframe = document.getElementById('game-frame') as HTMLIFrameElement | null;
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.addEventListener('unload', () => {
+                unsubscribe();
+            });
+        }
+        return unsubscribe;
     }
 };
 

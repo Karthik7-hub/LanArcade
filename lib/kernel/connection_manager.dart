@@ -23,6 +23,11 @@ class ConnectionManager {
 
   int get activeCount => _connections.length;
 
+  int getActiveConnectionsCount(String roomId) {
+    return _connections.values.where((conn) => conn.roomId == roomId).length;
+  }
+
+
   void addConnection(String id, WebSocketChannel socket) {
     _connections[id] = Connection(id, socket);
   }

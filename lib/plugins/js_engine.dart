@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_js/flutter_js.dart';
+import 'package:logging/logging.dart';
 import '../shared/models.dart';
 
 typedef StateCallback = void Function(Map<String, dynamic> state);
@@ -8,6 +9,7 @@ typedef PrivateStateCallback = void Function(String playerId, Map<String, dynami
 typedef AchievementCallback = void Function(String playerId, String achievementId);
 
 class JsEngine {
+  static final _log = Logger('JsEngine');
   late JavascriptRuntime _runtime;
   final GameManifest manifest;
   final StateCallback onPublicState;
@@ -30,45 +32,43 @@ class JsEngine {
   void _setupBridge() {
     _runtime.onMessage('broadcastPublicState', (dynamic args) {
       try {
-        final Map<String, dynamic> state = args is String 
-            ? Map<String, dynamic>.from(jsonDecode(args) as Map)
-            : <String, dynamic>{};
+        final state = _parseJsArgs(args);
         onPublicState(state);
       } catch (e) {
-        print('Error parsing public state: $e');
+        _log.warning('Error parsing public state: $e');
       }
     });
 
     _runtime.onMessage('sendPrivateState', (dynamic args) {
       try {
-        if (args is String) {
-          final Map<String, dynamic> data = Map<String, dynamic>.from(jsonDecode(args) as Map);
-          final String playerId = data['playerId'] as String? ?? '';
-          final Map<String, dynamic> state = data['state'] is Map
-              ? Map<String, dynamic>.from(data['state'] as Map)
-              : <String, dynamic>{};
-          onPrivateState(playerId, state);
-        }
+        final data = _parseJsArgs(args);
+        final String playerId = data['playerId'] as String? ?? '';
+        final Map<String, dynamic> state = data['state'] is Map
+            ? Map<String, dynamic>.from(data['state'] as Map)
+            : <String, dynamic>{};
+        onPrivateState(playerId, state);
       } catch (e) {
-        print('Error parsing private state: $e');
+        _log.warning('Error parsing private state: $e');
       }
     });
 
     _runtime.onMessage('unlockAchievement', (dynamic args) {
       try {
-        if (args is String) {
-          final Map<String, dynamic> data = Map<String, dynamic>.from(jsonDecode(args) as Map);
-          final String playerId = data['playerId'] as String? ?? '';
-          final String achievementId = data['achievementId'] as String? ?? '';
-          onAchievement(playerId, achievementId);
-        }
+        final data = _parseJsArgs(args);
+        final String playerId = data['playerId'] as String? ?? '';
+        final String achievementId = data['achievementId'] as String? ?? '';
+        onAchievement(playerId, achievementId);
       } catch (e) {
-        print('Error parsing achievement: $e');
+        _log.warning('Error parsing achievement: $e');
       }
     });
 
     _runtime.onMessage('consoleLog', (dynamic args) {
-      print('[JS Console] $args');
+      dynamic payload = args;
+      if (args is List && args.isNotEmpty) {
+        payload = args.first;
+      }
+      _log.info('[JS Console] $payload');
     });
 
     _runtime.evaluate('''
@@ -96,6 +96,29 @@ class JsEngine {
         }
       };
     ''');
+  }
+
+  Map<String, dynamic> _parseJsArgs(dynamic args) {
+    if (args == null) return <String, dynamic>{};
+    
+    dynamic payload = args;
+    if (args is List && args.isNotEmpty) {
+      payload = args.first;
+    }
+    
+    if (payload is Map) {
+      return Map<String, dynamic>.from(payload);
+    } else if (payload is String) {
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (e) {
+        _log.warning('Error decoding JS message JSON: $e. Payload was: $payload');
+      }
+    }
+    return <String, dynamic>{};
   }
 
   /// Helper to safely inject JSON into a JS evaluate call.
@@ -138,12 +161,12 @@ class JsEngine {
       }
     ''');
     if (injectRes.isError) {
-      print('JS Engine defaults injection error: ${injectRes.stringResult}');
+      _log.severe('JS Engine defaults injection error: ${injectRes.stringResult}');
     }
 
     final loadRes = _runtime.evaluate('engine.onLoad()');
     if (loadRes.isError) {
-      print('JS Engine onLoad error: ${loadRes.stringResult}');
+      _log.severe('JS Engine onLoad error: ${loadRes.stringResult}');
     }
   }
 
@@ -152,7 +175,7 @@ class JsEngine {
     final settingsJson = _escapeForJs(jsonEncode(settings));
     final result = _runtime.evaluate("engine.onInit(JSON.parse('$settingsJson'), JSON.parse('$playersJson'))");
     if (result.isError) {
-      print('JS Engine init error: ${result.stringResult}');
+      _log.severe('JS Engine init error: ${result.stringResult}');
     }
     _isInitialized = true;
     
@@ -163,11 +186,30 @@ class JsEngine {
 
   void _startTick() {
     _tickTimer?.cancel();
-    _tickTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+    
+    int tickRate = 2; // Default to 2 Hz (500ms)
+    final rateRes = _runtime.evaluate(
+      '(typeof engine !== "undefined" && engine.config && typeof engine.config.tickRate === "number") ? engine.config.tickRate : 2'
+    );
+    if (!rateRes.isError) {
+      final val = rateRes.rawResult;
+      if (val is num) {
+        tickRate = val.toInt();
+      } else if (rateRes.stringResult != 'null') {
+        tickRate = int.tryParse(rateRes.stringResult) ?? 2;
+      }
+    }
+    
+    final intervalMs = (1000 / tickRate).round();
+    final dt = intervalMs / 1000.0;
+    
+    _log.info('Starting JS tick timer with rate $tickRate Hz (interval: ${intervalMs}ms, dt: $dt)');
+    
+    _tickTimer = Timer.periodic(Duration(milliseconds: intervalMs), (timer) {
       if (_isInitialized) {
-        final result = _runtime.evaluate('engine.onTick(0.5)');
+        final result = _runtime.evaluate('engine.onTick($dt)');
         if (result.isError) {
-          print('JS Engine onTick error: ${result.stringResult}');
+          _log.severe('JS Engine onTick error: ${result.stringResult}');
         }
       }
     });
@@ -178,7 +220,7 @@ class JsEngine {
     final actionJson = _escapeForJs(jsonEncode({'type': type, 'data': data}));
     final result = _runtime.evaluate("engine.onAction(JSON.parse('$playerJson'), JSON.parse('$actionJson'))");
     if (result.isError) {
-      print('JS Engine handleAction error: ${result.stringResult}');
+      _log.severe('JS Engine handleAction error: ${result.stringResult}');
     }
   }
 
@@ -186,12 +228,12 @@ class JsEngine {
     final playerJson = _escapeForJs(jsonEncode(player.toJson()));
     final result = _runtime.evaluate("engine.onPlayerJoin(JSON.parse('$playerJson'))");
     if (result.isError) {
-      print('JS Engine playerJoined error: ${result.stringResult}');
+      _log.severe('JS Engine playerJoined error: ${result.stringResult}');
     }
     // Force the engine to re-sync state for the reconnected player
     final syncRes = _runtime.evaluate("if (typeof engine.sync === 'function') engine.sync();");
     if (syncRes.isError) {
-      print('JS Engine sync error: ${syncRes.stringResult}');
+      _log.severe('JS Engine sync error: ${syncRes.stringResult}');
     }
   }
 
@@ -199,7 +241,7 @@ class JsEngine {
     final playerJson = _escapeForJs(jsonEncode(player.toJson()));
     final result = _runtime.evaluate("engine.onPlayerLeave(JSON.parse('$playerJson'))");
     if (result.isError) {
-      print('JS Engine playerLeft error: ${result.stringResult}');
+      _log.severe('JS Engine playerLeft error: ${result.stringResult}');
     }
   }
 
@@ -207,14 +249,14 @@ class JsEngine {
     _tickTimer?.cancel();
     final result = _runtime.evaluate('engine.onPause()');
     if (result.isError) {
-      print('JS Engine pause error: ${result.stringResult}');
+      _log.severe('JS Engine pause error: ${result.stringResult}');
     }
   }
 
   void resume() {
     final result = _runtime.evaluate('engine.onResume()');
     if (result.isError) {
-      print('JS Engine resume error: ${result.stringResult}');
+      _log.severe('JS Engine resume error: ${result.stringResult}');
     }
     if (_isInitialized && manifest.permissions.contains('timers')) {
       _startTick();

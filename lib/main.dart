@@ -9,12 +9,12 @@ void main() {
   // Configure logging to print to console
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
-    print('${record.time.toIso8601String()} [${record.loggerName}] ${record.level.name}: ${record.message}');
+    debugPrint('${record.time.toIso8601String()} [${record.loggerName}] ${record.level.name}: ${record.message}');
     if (record.error != null) {
-      print('Error: ${record.error}');
+      debugPrint('Error: ${record.error}');
     }
     if (record.stackTrace != null) {
-      print('StackTrace: ${record.stackTrace}');
+      debugPrint('StackTrace: ${record.stackTrace}');
     }
   });
 

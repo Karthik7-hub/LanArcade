@@ -22,6 +22,7 @@ class WebSocketClient {
 
     this.socket.onmessage = (event) => {
       const data: PlatformEvent = JSON.parse(event.data);
+      useStore.getState().addDebugLog(`← IN: ${data.type}`);
       this.handleEvent(data);
     };
 
@@ -72,6 +73,7 @@ class WebSocketClient {
         break;
       case 'system.error':
         console.error('System Error:', event.payload);
+        store.setErrorAlert(String(event.payload));
         break;
       default:
         console.warn('Unknown event type:', event.type);
@@ -80,6 +82,7 @@ class WebSocketClient {
 
   send(type: string, payload: any) {
     if (this.socket?.readyState === WebSocket.OPEN) {
+      useStore.getState().addDebugLog(`→ OUT: ${type}`);
       this.socket.send(JSON.stringify({ type, payload }));
     }
   }

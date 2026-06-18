@@ -15,5 +15,35 @@
     "private-state",
     "persistent-storage"
   ],
-  "thumbnail": "thumbnail.png"
+  "thumbnail": "thumbnail.png",
+  "settingsSchema": {
+    "levelType": {
+      "type": "select",
+      "label": "Level Type",
+      "description": "Select level layout source",
+      "default": "handcrafted",
+      "options": [
+        {"value": "handcrafted", "label": "Handcrafted Levels (Fixed campaign)"},
+        {"value": "procedural", "label": "Procedural Levels (Infinite generation)"}
+      ]
+    },
+    "difficulty": {
+      "type": "select",
+      "label": "Puzzle Difficulty",
+      "description": "Scales hazards and complexity",
+      "default": "medium",
+      "options": [
+        {"value": "easy", "label": "Easy (Simple coordination)"},
+        {"value": "medium", "label": "Medium (Standard hazards)"},
+        {"value": "hard", "label": "Hard (Precise timing)"},
+        {"value": "insane", "label": "Insane (Chain reactions)"}
+      ]
+    },
+    "isDailyChallenge": {
+      "type": "boolean",
+      "label": "Daily Challenge Mode",
+      "description": "Uses daily date seed for level sync",
+      "default": false
+    }
+  }
 }

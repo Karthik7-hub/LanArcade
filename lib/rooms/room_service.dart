@@ -73,6 +73,19 @@ class RoomService {
     );
   }
 
+  Future<void> updateSettings(String roomId, Map<String, dynamic> settings) async {
+    await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
+      RoomsCompanion(settingsJson: Value(jsonEncode(settings))),
+    );
+  }
+
+  Future<void> updateHost(String roomId, String hostId) async {
+    await (db.update(db.rooms)..where((t) => t.id.equals(roomId))).write(
+      RoomsCompanion(hostId: Value(hostId)),
+    );
+  }
+
+
   /// Generate a unique 4-digit room code using secure random.
   String _generateCode() {
     return (1000 + _random.nextInt(9000)).toString();

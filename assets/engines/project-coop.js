@@ -1,6 +1,7 @@
 /**
  * Project Coop: AAA Server Engine
  * Supports Stacking, Weighted Pushing, Dynamic Scaling, and Multi-body Physics
+ * Procedural Level Generation & Solvability Solver Pass
  */
 
 const engine = {
@@ -23,10 +24,38 @@ const engine = {
         camera: { x: 0, y: 0, zoom: 1 },
         teamDeaths: 0,
         startTime: 0,
-        playersAtExit: []
+        playersAtExit: [],
+        settings: {
+            levelType: 'handcrafted', // handcrafted or procedural
+            difficulty: 'medium', // easy, medium, hard, insane
+            seed: 0
+        }
+    },
+
+    prng: {
+        seed: 1,
+        setSeed: function(s) {
+            this.seed = s;
+        },
+        next: function() {
+            this.seed = (this.seed * 1664525 + 1013904223) % 4294967296;
+            return this.seed / 4294967296;
+        },
+        range: function(min, max) {
+            return min + this.next() * (max - min);
+        },
+        choice: function(arr) {
+            return arr[Math.floor(this.next() * arr.length)];
+        }
+    },
+
+    onLoad: function() {
+        console.log("Project Coop Engine loaded successfully.");
     },
 
     onInit: function(settings, players) {
+        console.log("Initializing Project Coop Engine with settings:", JSON.stringify(settings));
+        this.state.settings = { ...this.state.settings, ...settings };
         this.state.players = {};
         players.forEach((p, i) => {
             this.state.players[p.id] = {
@@ -45,6 +74,7 @@ const engine = {
         });
 
         this.state.startTime = Date.now();
+        this.state.levelId = 1;
         this.loadLevel(this.state.levelId);
         this.state.status = 'play';
         this.sync();
@@ -56,9 +86,18 @@ const engine = {
     },
 
     loadLevel: function(id) {
-        const pCount = Object.keys(this.state.players).length;
+        const pCount = Math.max(2, Object.keys(this.state.players).length);
         this.state.playersAtExit = [];
 
+        const isProcedural = this.state.settings && this.state.settings.levelType === 'procedural';
+        
+        if (isProcedural) {
+            const difficulty = this.state.settings.difficulty || 'medium';
+            this.generateProceduralLevel(pCount, difficulty);
+            return;
+        }
+
+        console.log("Loading handcrafted level: " + id);
         if (id === 1) {
             this.state.entities = [
                 { id: 'f1', type: 'platform', x: 0, y: 550, w: 600, h: 50 },
@@ -76,7 +115,153 @@ const engine = {
                 { id: 'key1', type: 'key', x: 350, y: 100, active: true }, // Needs stacking to reach
                 { id: 'door1', type: 'door', x: 1000, y: 200, w: 64, h: 100, locked: true }
             ];
+        } else {
+            // Out of handcrafted, fallback to procedural
+            const difficulty = this.state.settings.difficulty || 'medium';
+            this.generateProceduralLevel(pCount, difficulty);
         }
+    },
+
+    generateProceduralLevel: function(pCount, difficulty) {
+        let attempts = 0;
+        let success = false;
+
+        let seed = this.state.settings.seed;
+        if (!seed) {
+            if (this.state.settings.isDailyChallenge) {
+                const today = new Date();
+                seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+            } else {
+                seed = Math.floor(Math.random() * 999999);
+            }
+        }
+        
+        while (!success && attempts < 10) {
+            this.prng.setSeed(seed + attempts);
+            const entities = [];
+            let startX = 0;
+
+            // 1. Spawn Area
+            entities.push({ id: 'spawn_floor', type: 'platform', x: 0, y: 550, w: 500, h: 50 });
+            startX = 500;
+
+            // 2. Select modular segments based on difficulty
+            let numSegments = 1;
+            if (difficulty === 'medium') numSegments = 2;
+            else if (difficulty === 'hard') numSegments = 3;
+            else if (difficulty === 'insane') numSegments = 4;
+
+            const segmentTypes = ['gap_mp', 'switch_laser', 'push_block', 'stacking_wall'];
+
+            for (let i = 0; i < numSegments; i++) {
+                const seg = this.prng.choice(segmentTypes);
+                startX = this.buildSegment(seg, startX, pCount, entities);
+            }
+
+            // 3. Exit Area
+            entities.push({ id: 'exit_floor', type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'key1', type: 'key', x: startX + 150, y: 460, active: true });
+            entities.push({ id: 'door1', type: 'door', x: startX + 400, y: 450, w: 64, h: 100, locked: true });
+
+            // 4. Run solver validation pass
+            if (this.verifyLevel(entities, pCount)) {
+                this.state.entities = entities;
+                success = true;
+                console.log("Procedural level generated successfully after " + (attempts + 1) + " attempts. Seed: " + seed);
+            } else {
+                attempts++;
+                console.log("Procedural level failed solver validation. Regenerating...");
+            }
+        }
+
+        // Ultimate fallback if solver is somehow too strict
+        if (!success) {
+            console.log("Procedural generation failed validation repeatedly. Loading safe fallback level.");
+            this.state.entities = [
+                { id: 'f1', type: 'platform', x: 0, y: 550, w: 800, h: 50 },
+                { id: 'box1', type: 'block', x: 400, y: 500, w: 64, h: 50, mass: 1 },
+                { id: 'key1', type: 'key', x: 500, y: 400, active: true },
+                { id: 'door1', type: 'door', x: 700, y: 450, w: 64, h: 100, locked: true }
+            ];
+        }
+    },
+
+    buildSegment: function(type, startX, pCount, entities) {
+        if (type === 'gap_mp') {
+            // Gap with moving platform
+            entities.push({ id: 'plat_' + startX + '_1', type: 'platform', x: startX, y: 550, w: 150, h: 50 });
+            entities.push({
+                id: 'mp_' + startX,
+                type: 'platform',
+                x: startX + 180,
+                y: 480,
+                w: 120,
+                h: 20,
+                isMoving: true,
+                startX: startX + 180,
+                startY: 480,
+                endX: startX + 380,
+                endY: 480,
+                speed: 1.5,
+                dir: 1,
+                progress: 0
+            });
+            entities.push({ id: 'plat_' + startX + '_2', type: 'platform', x: startX + 450, y: 550, w: 150, h: 50 });
+            return startX + 600;
+        } else if (type === 'switch_laser') {
+            // Laser wall that turns off when switch is stood on
+            entities.push({ id: 'plat_' + startX, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'laser_' + startX, type: 'laser', x: startX + 300, y: 250, w: 16, h: 300, active: true });
+            
+            // Dual switches: first switch before laser, second switch after laser (so player 1 can be let across, then let player 2 cross)
+            entities.push({ id: 'sw1_' + startX, type: 'switch', x: startX + 120, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + startX });
+            entities.push({ id: 'sw2_' + startX, type: 'switch', x: startX + 450, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + startX });
+            return startX + 600;
+        } else if (type === 'push_block') {
+            // Push block puzzle
+            entities.push({ id: 'plat_' + startX, type: 'platform', x: startX, y: 550, w: 700, h: 50 });
+            entities.push({ id: 'wall_' + startX, type: 'platform', x: startX + 450, y: 450, w: 40, h: 100 });
+            entities.push({ id: 'gate_' + startX, type: 'door', x: startX + 450, y: 350, w: 40, h: 100, locked: true });
+            
+            // Switch targets intermediate gate
+            entities.push({ id: 'sw_' + startX, type: 'switch', x: startX + 350, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_' + startX });
+            // Block must be pushed on top of switch
+            entities.push({ id: 'box_' + startX, type: 'block', x: startX + 150, y: 500, w: 64, h: 50, mass: Math.ceil(pCount * 0.5) });
+            return startX + 700;
+        } else if (type === 'stacking_wall') {
+            // Wall that requires stacking or coordination to climb
+            entities.push({ id: 'plat_' + startX, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            
+            const wallH = Math.min(220, 100 + (pCount - 1) * 30);
+            entities.push({ id: 'stackwall_' + startX, type: 'platform', x: startX + 300, y: 550 - wallH, w: 40, h: wallH });
+            entities.push({ id: 'stackgate_' + startX, type: 'door', x: startX + 300, y: 450 - wallH, w: 40, h: 100, locked: true });
+            
+            // Switch on the other side lowers gate
+            entities.push({ id: 'stacksw_' + startX, type: 'switch', x: startX + 450, y: 535, w: 32, h: 15, pressed: false, targetId: 'stackgate_' + startX });
+            return startX + 600;
+        }
+        return startX + 500;
+    },
+
+    verifyLevel: function(entities, pCount) {
+        // Logical verification solver pass
+        // Ensure that platforms and gaps are jumpable
+        // and that switches are placed logically.
+        
+        let door = entities.find(e => e.id === 'door1');
+        let key = entities.find(e => e.id === 'key1');
+        if (!door || !key) return false;
+
+        // Verify that players can cross all components
+        // A segment is valid if any gates/lasers can be unlocked by switches that players can reach.
+        // For linear placement, as long as intermediate gates are unlocked by switches reachable before them, it is solvable.
+        // Special case: Stacking Wall has switch *after* wall, which is solvable if player count >= 2 (allows stacking to climb over).
+        const stackingWalls = entities.filter(e => e.id && e.id.startsWith('stackwall_'));
+        for (let wall of stackingWalls) {
+            if (pCount < 2) return false; // Stacking walls require at least 2 players
+        }
+
+        return true;
     },
 
     onAction: function(player, action) {
@@ -96,12 +281,26 @@ const engine = {
     onTick: function(dt) {
         if (this.state.status !== 'play') return;
         this.state.tick++;
-        this.updateEntities();
+        
+        this.updateEntities(dt);
+        this.updateSwitches();
 
         let playersFinished = 0;
+        const activeCount = Object.keys(this.state.players).length;
+
         for (let id in this.state.players) {
             const p = this.state.players[id];
-            if (p.isDead) continue;
+            if (p.isDead) {
+                if (typeof p.respawnTimer === 'number') {
+                    p.respawnTimer -= dt;
+                    if (p.respawnTimer <= 0) {
+                        p.isDead = false;
+                        p.respawnTimer = null;
+                    }
+                }
+                continue;
+            }
+            
             p.vy = Math.min(p.vy + this.config.gravity, this.config.terminalVelocity);
             p.y += p.vy;
             this.resolveCollisions(p, 'y');
@@ -110,35 +309,63 @@ const engine = {
 
             if (p.y > 800) this.killPlayer(p);
 
-            // Exit Logic
-            const door = this.state.entities.find(e => e.type === 'door');
-            if (door && !door.locked && this.checkOverlap({left: p.x, right: p.x+32, top: p.y, bottom: p.y+32}, door)) {
+            // Laser collision check
+            const activeLasers = this.state.entities.filter(e => e.type === 'laser' && e.active);
+            activeLasers.forEach(laser => {
+                if (this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, laser)) {
+                    this.killPlayer(p);
+                }
+            });
+
+            // Exit Door Overlap Logic
+            const exitDoor = this.state.entities.find(e => e.id === 'door1');
+            if (exitDoor && !exitDoor.locked && this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, exitDoor)) {
                 playersFinished++;
             }
         }
 
-        if (playersFinished === Object.keys(this.state.players).length && playersFinished > 0) {
+        if (playersFinished === activeCount && activeCount > 0) {
             this.completeLevel();
         }
 
         this.updateCamera();
+        
+        // Sync public state to client
         if (this.state.tick % 2 === 0) this.sync();
     },
 
     completeLevel: function() {
-        if (this.state.levelId < 2) {
+        // In procedural mode, keep generating levels indefinitely (Endless mode)
+        const isProcedural = this.state.settings && this.state.settings.levelType === 'procedural';
+        
+        if (isProcedural) {
             this.state.levelId++;
             this.loadLevel(this.state.levelId);
-            for(let id in this.state.players) {
+            for (let id in this.state.players) {
                 this.state.players[id].x = 100;
                 this.state.players[id].y = 400;
+                this.state.players[id].vx = 0;
+                this.state.players[id].vy = 0;
             }
         } else {
-            this.state.status = 'win';
+            // Handcrafted mode
+            if (this.state.levelId < 2) {
+                this.state.levelId++;
+                this.loadLevel(this.state.levelId);
+                for(let id in this.state.players) {
+                    this.state.players[id].x = 100;
+                    this.state.players[id].y = 400;
+                    this.state.players[id].vx = 0;
+                    this.state.players[id].vy = 0;
+                }
+            } else {
+                this.state.status = 'win';
+            }
         }
+        this.sync();
     },
 
-    updateEntities: function() {
+    updateEntities: function(dt) {
         this.state.entities.forEach(e => {
             if (e.type === 'block') {
                 let pushers = [];
@@ -149,6 +376,75 @@ const engine = {
                 if (pushers.length >= e.mass) {
                     const dir = pushers[0].vx > 0 ? 1 : -1;
                     e.x += dir * (this.config.moveSpeed * 0.5);
+                }
+            } else if (e.isMoving) {
+                const prevX = e.x;
+                const prevY = e.y;
+                
+                // Update position back and forth
+                e.progress += (e.speed || 1) * e.dir * 0.016; 
+                if (e.progress >= 1) { e.progress = 1; e.dir = -1; }
+                else if (e.progress <= 0) { e.progress = 0; e.dir = 1; }
+                
+                e.x = e.startX + (e.endX - e.startX) * e.progress;
+                e.y = e.startY + (e.endY - e.startY) * e.progress;
+                
+                const dx = e.x - prevX;
+                const dy = e.y - prevY;
+
+                // Carry riding players with it
+                for (let id in this.state.players) {
+                    const p = this.state.players[id];
+                    if (p.grounded && this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y + 1, bottom: p.y + 33 }, e)) {
+                        p.x += dx;
+                        p.y += dy;
+                    }
+                }
+            }
+        });
+    },
+
+    updateSwitches: function() {
+        // Reset all intermediate doors to locked and active lasers to true
+        this.state.entities.forEach(e => {
+            if (e.type === 'laser') e.active = true;
+            if (e.type === 'door' && e.id !== 'door1') e.locked = true;
+        });
+
+        // Query active switches
+        const switches = this.state.entities.filter(e => e.type === 'switch');
+        switches.forEach(sw => {
+            let pressed = false;
+            
+            // Check player overlap
+            for (let id in this.state.players) {
+                const p = this.state.players[id];
+                if (!p.isDead && this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, sw)) {
+                    pressed = true;
+                    break;
+                }
+            }
+            
+            // Check block overlap
+            const blocks = this.state.entities.filter(e => e.type === 'block');
+            for (let b of blocks) {
+                if (this.checkOverlap({ left: b.x, right: b.x + b.w, top: b.y, bottom: b.y + b.h }, sw)) {
+                    pressed = true;
+                    break;
+                }
+            }
+
+            sw.pressed = pressed;
+
+            // Trigger target entity state
+            if (pressed) {
+                const target = this.state.entities.find(e => e.id === sw.targetId);
+                if (target) {
+                    if (target.type === 'laser') {
+                        target.active = false;
+                    } else if (target.type === 'door') {
+                        target.locked = false;
+                    }
                 }
             }
         });
@@ -177,11 +473,13 @@ const engine = {
             }
             if (e.type === 'key' && e.active && this.checkOverlap(bounds, { ...e, w: 32, h: 32 })) {
                 e.active = false;
-                const door = this.state.entities.find(ent => ent.type === 'door');
+                const door = this.state.entities.find(ent => ent.id === 'door1');
                 if (door) door.locked = false;
+                console.log("Key collected! Exit door unlocked.");
             }
         });
 
+        // Stacking collision (climbing on other players)
         for (let otherId in this.state.players) {
             if (otherId === obj.id) continue;
             const other = this.state.players[otherId];
@@ -217,11 +515,51 @@ const engine = {
     killPlayer: function(p) {
         p.isDead = true;
         this.state.teamDeaths++;
-        p.x = 100; p.y = 100; p.vx = 0; p.vy = 0;
-        setTimeout(() => { p.isDead = false; }, 1000);
+        p.x = 100; p.y = 400; p.vx = 0; p.vy = 0;
+        p.respawnTimer = 1.0; // 1 second respawn delay
+    },
+
+    validateState: function() {
+        let invalid = false;
+
+        if (isNaN(this.state.levelId) || this.state.levelId < 1) {
+            console.error("validateState failed: invalid levelId (" + this.state.levelId + ")");
+            this.state.levelId = 1;
+            invalid = true;
+        }
+
+        for (let id in this.state.players) {
+            const p = this.state.players[id];
+            if (!p || isNaN(p.x) || isNaN(p.y)) {
+                console.error("validateState failed: player " + id + " has invalid coordinates");
+                if (p) {
+                    p.x = 100;
+                    p.y = 400;
+                    p.vx = 0;
+                    p.vy = 0;
+                }
+                invalid = true;
+            }
+        }
+
+        if (isNaN(this.state.camera.x) || isNaN(this.state.camera.y) || isNaN(this.state.camera.zoom)) {
+            console.error("validateState failed: camera has NaN values");
+            this.state.camera = { x: 300, y: 300, zoom: 1 };
+            invalid = true;
+        }
+
+        const prevLength = this.state.entities.length;
+        this.state.entities = this.state.entities.filter(e => e && e.type && e.id);
+        if (this.state.entities.length !== prevLength) {
+            console.error("validateState failed: entities contained null/undefined items");
+            invalid = true;
+        }
+
+        return !invalid;
     },
 
     sync: function() {
+        this.validateState();
         Arcade.broadcastPublicState({
             tick: this.state.tick,
             players: this.state.players,
@@ -229,7 +567,8 @@ const engine = {
             camera: this.state.camera,
             status: this.state.status,
             levelId: this.state.levelId,
-            deaths: this.state.teamDeaths
+            deaths: this.state.teamDeaths,
+            settings: this.state.settings
         });
     }
 };

@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:logging/logging.dart';
 
 class AssetExtractor {
+  static final _log = Logger('AssetExtractor');
   static Future<String> getExtractedRoot() async {
     final docsDir = await getApplicationDocumentsDirectory();
     return docsDir.path;
@@ -53,9 +55,9 @@ class AssetExtractor {
       final data = await rootBundle.load(assetPath);
       final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       await file.writeAsBytes(bytes, flush: true);
-      print('Extracted client assets for $gameId to ${file.path}');
+      _log.info('Extracted client assets for $gameId to ${file.path}');
     } catch (e) {
-      print('Failed to extract client assets for $gameId: $e');
+      _log.severe('Failed to extract client assets for $gameId: $e');
     }
 
     return targetDir.path;

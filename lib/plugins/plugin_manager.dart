@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:logging/logging.dart';
 import '../shared/models.dart';
 
 class PluginManager {
+  static final _log = Logger('PluginManager');
   final Map<String, GameManifest> _registry = {};
   final String manifestsDir = 'assets/manifests';
   final String enginesDir = 'assets/engines';
@@ -22,17 +24,17 @@ class PluginManager {
           final content = await rootBundle.loadString(path);
           final gameManifest = GameManifest.fromJson(json.decode(content));
           if (!gameManifest.sdkVersion.startsWith('1.')) {
-            print('Skipped plugin ${gameManifest.name}: SDK version ${gameManifest.sdkVersion} is incompatible with host SDK 1.0.0');
+            _log.warning('Skipped plugin ${gameManifest.name}: SDK version ${gameManifest.sdkVersion} is incompatible with host SDK 1.0.0');
             continue;
           }
           _registry[gameManifest.id] = gameManifest;
-          print('Loaded plugin: ${gameManifest.name} (${gameManifest.id})');
+          _log.info('Loaded plugin: ${gameManifest.name} (${gameManifest.id})');
         } catch (e) {
-          print('Failed to load plugin at $path: $e');
+          _log.severe('Failed to load plugin at $path: $e');
         }
       }
     } catch (e) {
-      print('Error scanning plugins: $e');
+      _log.severe('Error scanning plugins: $e');
     }
   }
 
