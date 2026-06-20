@@ -91,11 +91,54 @@ const engine = {
         this.state.direction = 1;
         
         this.resetTurnTimer();
+        this.checkOfflinePlayerTurn();
         this.sync();
+    },
+
+    checkOfflinePlayerTurn: function() {
+        if (this.state.status !== 'active') return;
+        
+        // Count active online players
+        const activeOnlinePlayers = this.state.playerIds.filter(id => 
+            (!this.state.offlinePlayers || !this.state.offlinePlayers.includes(id)) && 
+            !this.state.finishedPlayers.includes(id)
+        );
+        
+        if (activeOnlinePlayers.length === 0) {
+            console.log("No online players left. Suspending automatic offline turns.");
+            return;
+        }
+
+        const currentId = this.state.playerIds[this.state.currentPlayerIndex];
+        if (this.state.offlinePlayers && this.state.offlinePlayers.includes(currentId)) {
+            console.log("Current player " + currentId + " is offline. Auto-drawing a card in their absence.");
+            
+            // Draw a card for the offline player
+            if (this.state.drawPending > 0) {
+                this.applyPenalty(currentId, this.state.drawPending);
+                this.state.drawPending = 0;
+            } else {
+                this.drawOne(currentId);
+            }
+            
+            // Advance turn, which will call checkOfflinePlayerTurn again if the next player is offline
+            this.advanceTurn(1);
+        }
     },
 
     onPlayerLeave: function(player) {
         console.log("onPlayerLeave called for player: " + player.id);
+        
+        if (this.state.status === 'active') {
+            if (!this.state.offlinePlayers) this.state.offlinePlayers = [];
+            if (!this.state.offlinePlayers.includes(player.id)) {
+                this.state.offlinePlayers.push(player.id);
+                console.log("Player " + player.id + " marked as offline in active game.");
+            }
+            this.checkOfflinePlayerTurn();
+            return;
+        }
+
         const index = this.state.playerIds.indexOf(player.id);
         if (index === -1) return;
 
@@ -105,15 +148,19 @@ const engine = {
             nextPlayerId = this.getNextPlayerId();
         }
 
-        // Return their hand cards back to the deck
-        const hand = this.state.hands[player.id];
-        if (hand && hand.length > 0) {
-            this.state.deck = hand.concat(this.state.deck);
+        // Save hand and score to offline storage for potential reconnect
+        if (!this.state.offlineHands) this.state.offlineHands = {};
+        if (!this.state.offlineScores) this.state.offlineScores = {};
+
+        if (this.state.hands[player.id]) {
+            this.state.offlineHands[player.id] = this.state.hands[player.id];
             delete this.state.hands[player.id];
         }
+        if (this.state.scores[player.id] !== undefined) {
+            this.state.offlineScores[player.id] = this.state.scores[player.id];
+            delete this.state.scores[player.id];
+        }
         
-        // Remove score, placements, finishedPlayers, etc.
-        delete this.state.scores[player.id];
         if (this.state.unoDeclared) delete this.state.unoDeclared[player.id];
         this.state.finishedPlayers = (this.state.finishedPlayers || []).filter(id => id !== player.id);
 
@@ -149,6 +196,32 @@ const engine = {
             }
         }
 
+        this.sync();
+    },
+
+    onPlayerJoin: function(player) {
+        console.log("onPlayerJoin called for player: " + player.id);
+        if (this.state.offlinePlayers) {
+            this.state.offlinePlayers = this.state.offlinePlayers.filter(id => id !== player.id);
+        }
+        if (!this.state.playerIds.includes(player.id)) {
+            this.state.playerIds.push(player.id);
+        }
+        
+        if (this.state.offlineHands && this.state.offlineHands[player.id]) {
+            this.state.hands[player.id] = this.state.offlineHands[player.id];
+            delete this.state.offlineHands[player.id];
+        } else if (!this.state.hands[player.id]) {
+            this.state.hands[player.id] = [];
+        }
+        
+        if (this.state.offlineScores && this.state.offlineScores[player.id] !== undefined) {
+            this.state.scores[player.id] = this.state.offlineScores[player.id];
+            delete this.state.offlineScores[player.id];
+        } else if (this.state.scores[player.id] === undefined) {
+            this.state.scores[player.id] = 0;
+        }
+        
         this.sync();
     },
 
@@ -445,6 +518,8 @@ const engine = {
         
         this.state.currentPlayerIndex = index;
         console.log("Turn advanced to: player " + this.state.playerIds[this.state.currentPlayerIndex]);
+        
+        this.checkOfflinePlayerTurn();
     },
 
     getNextPlayerId: function() {
@@ -590,7 +665,8 @@ const engine = {
             settings: this.state.settings,
             playerCardCounts: {},
             unoDeclared: this.state.unoDeclared,
-            finishedPlayers: this.state.finishedPlayers || []
+            finishedPlayers: this.state.finishedPlayers || [],
+            offlinePlayers: this.state.offlinePlayers || []
         };
         this.state.playerIds.forEach(id => {
             publicState.playerCardCounts[id] = this.state.hands[id] ? this.state.hands[id].length : 0;

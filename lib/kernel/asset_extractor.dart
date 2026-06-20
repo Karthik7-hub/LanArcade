@@ -6,6 +6,8 @@ import 'package:logging/logging.dart';
 
 class AssetExtractor {
   static final _log = Logger('AssetExtractor');
+  static const String _version = '1.0.0+1';
+
   static Future<String> getExtractedRoot() async {
     final docsDir = await getApplicationDocumentsDirectory();
     return docsDir.path;
@@ -17,6 +19,15 @@ class AssetExtractor {
     
     if (!await targetDir.exists()) {
       await targetDir.create(recursive: true);
+    }
+
+    final versionFile = File(p.join(targetDir.path, 'version.txt'));
+    if (await versionFile.exists()) {
+      final currentVersion = await versionFile.readAsString();
+      if (currentVersion.trim() == _version) {
+        _log.info('Shell assets already up-to-date at version $_version. Skipping extraction.');
+        return targetDir.path;
+      }
     }
 
     final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
@@ -38,6 +49,12 @@ class AssetExtractor {
       }
     }
 
+    try {
+      await versionFile.writeAsString(_version, flush: true);
+    } catch (e) {
+      _log.warning('Failed to write version file: $e');
+    }
+
     return targetDir.path;
   }
 
@@ -47,6 +64,15 @@ class AssetExtractor {
     
     if (!await targetDir.exists()) {
       await targetDir.create(recursive: true);
+    }
+
+    final versionFile = File(p.join(targetDir.path, 'version.txt'));
+    if (await versionFile.exists()) {
+      final currentVersion = await versionFile.readAsString();
+      if (currentVersion.trim() == _version) {
+        _log.info('Game assets for $gameId already up-to-date at version $_version. Skipping extraction.');
+        return targetDir.path;
+      }
     }
 
     try {
@@ -71,6 +97,12 @@ class AssetExtractor {
         final fileBytes = fileData.buffer.asUint8List(fileData.offsetInBytes, fileData.lengthInBytes);
         await targetFile.writeAsBytes(fileBytes, flush: true);
         _log.info('Extracted sub-asset for $gameId: $relativePath to ${targetFile.path}');
+      }
+
+      try {
+        await versionFile.writeAsString(_version, flush: true);
+      } catch (e) {
+        _log.warning('Failed to write version file for game $gameId: $e');
       }
     } catch (e) {
       _log.severe('Failed to extract client assets for $gameId: $e');

@@ -40,6 +40,11 @@ class KernelRuntime {
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get statsStream => _statsController.stream;
 
+  void logSystemEvent(String msg) {
+    _log.info(msg);
+    _statsController.add({'log': msg});
+  }
+
   KernelRuntime({
     required this.pluginManager,
     required this.db,
@@ -236,6 +241,10 @@ class KernelRuntime {
     if (connection == null) return;
 
     switch (type) {
+      case 'ping':
+        connection.send('pong', null);
+        break;
+
       case 'player.identify':
         final player = models.Player(
           id: payload['id'] ?? _uuid.v4(),
@@ -243,7 +252,9 @@ class KernelRuntime {
           avatar: payload['avatar'] ?? 'default',
         );
         connection.player = player;
+        connectionManager.removeStaleConnections(player.id, connectionId);
         connection.send('player.identified', player.toJson());
+        logSystemEvent('PLAYER_IDENTIFIED: connectionId=$connectionId, player=${player.name} (${player.id})');
         break;
 
       case 'room.create':
@@ -275,10 +286,12 @@ class KernelRuntime {
           connection.roomId = room.id;
           roomData[room.id] = room;
           connection.send('room.update', room.toJson());
+          logSystemEvent('ROOM_CREATED: roomCode=${room.code}, game=${manifest.name}, host=${connection.player!.name}');
 
           final code = await pluginManager.getEngineCode(manifest.id);
           final engine = JsEngine(
             manifest: manifest,
+            onLog: logSystemEvent,
             onPublicState: (state) {
               final currentRoom = roomData[room.id];
               if (currentRoom != null) {
@@ -348,10 +361,6 @@ class KernelRuntime {
           );
           await engine.load(code);
           activeEngines[room.id] = engine;
-
-          _statsController.add({
-            'log': 'ROOM_CREATED: ${room.code} (${manifest.name})',
-          });
         }
         break;
 
@@ -374,12 +383,18 @@ class KernelRuntime {
           }
 
           // Cancel any pending cleanup timers for this room since a player has rejoined
-          _cleanupTimers[roomId]?.cancel();
-          _cleanupTimers.remove(roomId);
+          if (_cleanupTimers.containsKey(roomId)) {
+            _cleanupTimers[roomId]?.cancel();
+            _cleanupTimers.remove(roomId);
+            logSystemEvent('CLEANUP_TIMER_CANCELLED: Player rejoined roomCode=$code.');
+          }
 
           if (!isAlreadyInRoom) {
             room.players.add(connection.player!);
             await roomService.updatePlayers(roomId, room.players);
+            logSystemEvent('PLAYER_JOINED_ROOM: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
+          } else {
+            logSystemEvent('PLAYER_RECONNECTED: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
           }
           connection.roomId = roomId;
           connection.send('room.update', room.toJson());
@@ -453,8 +468,10 @@ class KernelRuntime {
 
           // Load code for new game and create engine
           final code = await pluginManager.getEngineCode(manifest.id);
+          logSystemEvent('ROOM_GAME_CHANGED: roomCode=${room.code}, game=${manifest.name}');
           final newEngine = JsEngine(
             manifest: manifest,
+            onLog: logSystemEvent,
             onPublicState: (state) {
               final currentRoom = roomData[room.id];
               if (currentRoom != null) {
@@ -550,8 +567,10 @@ class KernelRuntime {
 
           // Load code for game and create fresh engine
           final code = await pluginManager.getEngineCode(room.game.id);
+          logSystemEvent('ROOM_RESET: roomCode=${room.code}');
           final newEngine = JsEngine(
             manifest: room.game,
+            onLog: logSystemEvent,
             onPublicState: (state) {
               final currentRoom = roomData[room.id];
               if (currentRoom != null) {
@@ -689,30 +708,31 @@ class KernelRuntime {
         connection.roomId != null &&
         connection.player != null) {
       final roomId = connection.roomId!;
+      final room = roomData[roomId];
+      final roomCode = room?.code ?? '';
       final engine = activeEngines[roomId];
+      logSystemEvent('PLAYER_DISCONNECTED: player=${connection.player!.name} (${connection.player!.id}), roomCode=$roomCode, connectionId=$connectionId');
+      
       engine?.playerLeft(connection.player!);
 
       connectionManager.removeConnection(connectionId);
       final remaining = connectionManager.getActiveConnectionsCount(roomId);
       if (remaining == 0) {
-        _log.info('Room $roomId has 0 active players. Starting 60s cleanup timer.');
+        logSystemEvent('LAST_PLAYER_DISCONNECTED: roomCode=$roomCode has 0 active players. Starting 60s cleanup timer.');
         _cleanupTimers[roomId]?.cancel();
         _cleanupTimers[roomId] = Timer(const Duration(seconds: 60), () async {
           _cleanupTimers.remove(roomId);
           final currentRemaining = connectionManager.getActiveConnectionsCount(roomId);
           if (currentRemaining == 0) {
-            _log.info('Room $roomId cleanup timer expired. Destroying room.');
+            logSystemEvent('CLEANUP_TIMER_EXPIRED: roomCode=$roomCode. Destroying room.');
             await _destroyRoom(roomId);
           }
         });
       }
     } else {
       connectionManager.removeConnection(connectionId);
+      logSystemEvent('WS_CLOSED: connectionId=$connectionId');
     }
-    _statsController.add({
-      'log': 'WS_CLOSED: $connectionId',
-      'activeConnections': connectionManager.activeCount,
-    });
   }
 
   // --- Recovery ---
@@ -745,6 +765,7 @@ class KernelRuntime {
 
           final engine = JsEngine(
             manifest: manifest,
+            onLog: logSystemEvent,
             onPublicState: (state) {
               final currentRoom = roomData[room.id];
               if (currentRoom != null) {

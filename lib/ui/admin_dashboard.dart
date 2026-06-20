@@ -132,7 +132,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       );
       if (confirm != true) return;
 
-      _kernel.stop();
+      await _kernel.stop();
       await _discovery.stop();
       setState(() {
         _isRunning = false;

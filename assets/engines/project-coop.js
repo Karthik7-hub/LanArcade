@@ -56,15 +56,41 @@ const engine = {
     onPlayerLeave: function(player) {
         console.log("onPlayerLeave called for player: " + player.id);
         if (this.state.players[player.id]) {
+            if (!this.state.offlinePlayers) this.state.offlinePlayers = {};
+            this.state.offlinePlayers[player.id] = this.state.players[player.id];
             delete this.state.players[player.id];
         }
         
         // Check if there are no players left
         const activeCount = Object.keys(this.state.players).length;
-        if (activeCount === 0) {
+        const offlineCount = this.state.offlinePlayers ? Object.keys(this.state.offlinePlayers).length : 0;
+        if (activeCount === 0 && offlineCount === 0) {
             this.state.status = 'finished';
         }
         
+        this.sync();
+    },
+
+    onPlayerJoin: function(player) {
+        console.log("onPlayerJoin called for player: " + player.id);
+        if (this.state.offlinePlayers && this.state.offlinePlayers[player.id]) {
+            this.state.players[player.id] = this.state.offlinePlayers[player.id];
+            delete this.state.offlinePlayers[player.id];
+        } else if (!this.state.players[player.id]) {
+            this.state.players[player.id] = {
+                id: player.id,
+                name: player.name,
+                x: 100,
+                y: 400,
+                vx: 0,
+                vy: 0,
+                grounded: false,
+                facing: 1,
+                color: '#6366F1',
+                state: 'idle',
+                isDead: false
+            };
+        }
         this.sync();
     },
 

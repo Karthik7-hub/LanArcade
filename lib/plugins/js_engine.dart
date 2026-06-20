@@ -7,6 +7,7 @@ import '../shared/models.dart';
 typedef StateCallback = void Function(Map<String, dynamic> state);
 typedef PrivateStateCallback = void Function(String playerId, Map<String, dynamic> state);
 typedef AchievementCallback = void Function(String playerId, String achievementId);
+typedef LogCallback = void Function(String message);
 
 class JsEngine {
   static final _log = Logger('JsEngine');
@@ -15,6 +16,7 @@ class JsEngine {
   final StateCallback onPublicState;
   final PrivateStateCallback onPrivateState;
   final AchievementCallback onAchievement;
+  final LogCallback? onLog;
   
   Timer? _tickTimer;
   bool _isInitialized = false;
@@ -24,6 +26,7 @@ class JsEngine {
     required this.onPublicState,
     required this.onPrivateState,
     required this.onAchievement,
+    this.onLog,
   }) {
     _runtime = getJavascriptRuntime();
     _setupBridge();
@@ -69,6 +72,7 @@ class JsEngine {
         payload = args.first;
       }
       _log.info('[JS Console] $payload');
+      onLog?.call('[JS Console] $payload');
     });
 
     _runtime.evaluate('''

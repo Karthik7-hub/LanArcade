@@ -6,6 +6,7 @@ class WebSocketClient {
   private url: string = '';
   private reconnectTimer: any = null;
   private messageQueue: { type: string; payload: any }[] = [];
+  private pingInterval: any = null;
 
   connect(url: string) {
     this.url = url;
@@ -29,6 +30,8 @@ class WebSocketClient {
       queue.forEach((msg) => {
         this.send(msg.type, msg.payload);
       });
+
+      this.startHeartbeat();
     };
 
     this.socket.onmessage = (event) => {
@@ -49,6 +52,7 @@ class WebSocketClient {
   }
 
   private cleanup() {
+    this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -73,9 +77,25 @@ class WebSocketClient {
     }, 2000);
   }
 
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.pingInterval = setInterval(() => {
+      this.send('ping', null);
+    }, 20000);
+  }
+
+  private stopHeartbeat() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+  }
+
   private handleEvent(event: PlatformEvent) {
     const store = useStore.getState();
     switch (event.type) {
+      case 'pong':
+        break;
       case 'player.identified':
         store.setPlayer(event.payload);
         const params = new URLSearchParams(window.location.search);

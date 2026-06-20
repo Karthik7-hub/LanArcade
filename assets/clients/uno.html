@@ -851,6 +851,27 @@
             return s[(v - 20) % 10] || s[v] || s[0];
         }
 
+        function isCardPlayable(card, publicState, isMyTurn) {
+            if (!isMyTurn) return false;
+            if (!publicState) return false;
+            
+            // Stacking Logic / Penalty pending
+            if (publicState.drawPending > 0) {
+                if (!publicState.settings || !publicState.settings.stacking) {
+                    return false; // Stacking disabled, must draw penalty
+                }
+                // If stacking is enabled:
+                // DrawTwo on DrawTwo, or WildDrawFour on WildDrawFour, or WildDrawFour on DrawTwo
+                return (card.value === 'DrawTwo' && publicState.currentValue === 'DrawTwo') ||
+                       (card.value === 'WildDrawFour');
+            }
+
+            // Normal match logic
+            return card.color === 'Wild' || 
+                   card.color === publicState.currentColor || 
+                   card.value === publicState.currentValue;
+        }
+
         let selectedCardIdx = null;
         let lbOpen = false;
         const catchableTimestamps = {}; // { oppId: firstSeenTimestamp }
@@ -1593,11 +1614,7 @@
                 DOM.handContainer.style.paddingRight = '40px';
                 
                 DOM.handContainer.innerHTML = hand.map((card, idx) => {
-                    const playable = isMyTurn && (
-                        card.color === 'Wild' || 
-                        card.color === publicState.currentColor || 
-                        card.value === publicState.currentValue
-                    );
+                    const playable = isCardPlayable(card, publicState, isMyTurn);
                     const isSelected = selectedCardIdx === idx;
                     const extraStyle = isSelected ? 'transform: translateY(-30px) scale(1.1); z-index: 1000; box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6); margin-right: 12px;' : '';
                     return `
@@ -1627,11 +1644,7 @@
                     const y = Math.abs(offset) * 2 - (isSelected ? 30 : 0);
                     const extraStyle = isSelected ? 'transform: scale(1.1); z-index: 1000; box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);' : '';
 
-                    const playable = isMyTurn && (
-                        card.color === 'Wild' || 
-                        card.color === publicState.currentColor || 
-                        card.value === publicState.currentValue
-                    );
+                    const playable = isCardPlayable(card, publicState, isMyTurn);
 
                     return `
                         <div class="hand-slot" style="transform: translateX(${x}px) translateY(${y}px) rotate(${rot}deg); z-index: ${isSelected ? 1000 : idx}">

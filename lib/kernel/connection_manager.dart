@@ -42,6 +42,21 @@ class ConnectionManager {
 
   Connection? getConnection(String id) => _connections[id];
 
+  void removeStaleConnections(String playerId, String keepConnectionId) {
+    final toRemove = <String>[];
+    for (var conn in _connections.values) {
+      if (conn.player?.id == playerId && conn.id != keepConnectionId) {
+        toRemove.add(conn.id);
+        try {
+          conn.close();
+        } catch (_) {}
+      }
+    }
+    for (var id in toRemove) {
+      _connections.remove(id);
+    }
+  }
+
   void broadcastToRoom(String roomId, String type, dynamic payload) {
     for (var conn in _connections.values) {
       if (conn.roomId == roomId) {

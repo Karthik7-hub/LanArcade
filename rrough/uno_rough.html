@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neko Co-op Platformer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: white;
+            font-family: 'Inter', system-ui, sans-serif;
+            touch-action: none;
+            /* Prevent scroll on mobile */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #1e293b;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        #ui-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .menu-box {
+            pointer-events: auto;
+            background: rgba(30, 41, 59, 0.95);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            border: 4px solid #3b82f6;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            width: 90%;
+            max-width: 550px;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #3b82f6, #2563eb);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.1s;
+            border: 0;
+            box-shadow: 0 4px 0 #1d4ed8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #1d4ed8;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #1d4ed8;
+        }
+
+        .player-count-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .player-btn {
+            width: 55px;
+            height: 55px;
+            border-radius: 12px;
+            background: #334155;
+            color: #94a3b8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: 3px solid #475569;
+            transition: all 0.2s;
+        }
+
+        .player-btn.selected {
+            background: #eab308;
+            color: #422006;
+            border-color: #facc15;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.5);
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 10;
+        }
+
+        #level-indicator {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: white;
+            text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+        }
+
+        #btn-restart {
+            pointer-events: auto;
+            background: rgba(220, 38, 38, 0.8);
+            border: 2px solid #ef4444;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+
+        #btn-restart:active {
+            background: #b91c1c;
+        }
+
+        #touch-controls {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            width: 100%;
+            padding: 0 5vw;
+            box-sizing: border-box;
+            display: none;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        #touch-controls.layout-split {
+            justify-content: space-between;
+        }
+
+        #touch-controls.layout-left {
+            justify-content: flex-start;
+            gap: 40px;
+        }
+
+        #touch-controls.layout-right {
+            justify-content: flex-end;
+            gap: 40px;
+        }
+
+        .touch-btn {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.1);
+            border: 4px solid rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(8px);
+            color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            touch-action: manipulation;
+        }
+
+        .touch-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: white;
+            transform: scale(0.95);
+        }
+
+        .dpad-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn-move {
+            width: 80px;
+            height: 80px;
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .btn-action {
+            width: 100px;
+            height: 100px;
+            font-size: 3rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+        <div id="hud">
+            <div id="level-indicator">Level 1</div>
+            <button id="btn-restart" title="Restart Level (R)">⟳ Restart Level</button>
+        </div>
+
+        <div id="touch-controls" class="layout-split">
+            <div class="dpad-container">
+                <div class="touch-btn btn-move" id="btn-left">←</div>
+                <div class="touch-btn btn-move" id="btn-right">→</div>
+            </div>
+            <div class="touch-btn btn-action" id="btn-jump">↑</div>
+        </div>
+
+        <div id="ui-layer">
+            <div id="main-menu" class="menu-box">
+                <h1 class="text-5xl font-black mb-2 text-blue-400" style="text-shadow: 0 4px 0 #1e3a8a;">Neko Co-op</h1>
+                <p class="mb-6 text-gray-300 font-medium">Work together. No cat left behind.</p>
+
+                <h3 class="font-bold text-xl mb-3 text-white">How many players?</h3>
+                <div class="player-count-selector" id="player-selector"></div>
+
+                <div class="bg-slate-800 p-4 rounded-xl mb-6 border border-slate-600">
+                    <div class="mb-3 text-left">
+                        <label class="block text-sm font-bold text-blue-300 mb-1">Select Level:</label>
+                        <select id="level-select"
+                            class="w-full p-2 border rounded bg-slate-900 text-white border-slate-700 outline-none focus:border-blue-500">
+                            <option value="0">1. Walk Together</option>
+                            <option value="1">2. The High Wall</option>
+                            <option value="2">3. The Gap</option>
+                            <option value="3">4. Team Jump</option>
+                            <option value="4">5. Push Box</option>
+                            <option value="5">6. Key Collection</option>
+                            <option value="6">7. Box Puzzle</option>
+                            <option value="7">8. Switch Hold</option>
+                            <option value="8">9. The Pit</option>
+                            <option value="9">10. Tower Climb</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 text-left">
+                        <label class="block text-sm font-bold text-blue-300 mb-1">On-Screen Controls:</label>
+                        <select id="touch-player-select"
+                            class="w-full p-2 border rounded bg-slate-900 text-white border-slate-700 outline-none">
+                            <option value="-1">Hide Controls (Keyboard/Gamepad only)</option>
+                            <option value="0" selected>Assign to Player 1 (Red)</option>
+                            <option value="1">Assign to Player 2 (Blue)</option>
+                            <option value="2">Assign to Player 3 (Green)</option>
+                            <option value="3">Assign to Player 4 (Yellow)</option>
+                        </select>
+                    </div>
+
+                    <div class="text-left">
+                        <label class="block text-sm font-bold text-blue-300 mb-1">Control Layout:</label>
+                        <select id="touch-layout-select"
+                            class="w-full p-2 border rounded bg-slate-900 text-white border-slate-700 outline-none">
+                            <option value="layout-split">Split (Left/Right)</option>
+                            <option value="layout-left">All on Left</option>
+                            <option value="layout-right">All on Right</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn w-full text-2xl py-4" id="btn-start">START GAME</button>
+                <p class="mt-4 text-xs text-gray-400">Controls: WASD, Arrows, IJKL, Numpad, Gamepads</p>
+            </div>
+
+            <div id="message-overlay" class="menu-box" style="display: none;">
+                <h2 id="message-title" class="text-4xl font-bold mb-6 text-green-400">Level Clear!</h2>
+                <button class="btn w-full py-3" id="btn-next">Next Level</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        // Core Physics & Sizing - Tuned for extremely tight platforming
+        const TILE = 48;
+        const GRAVITY = 0.65;
+        const MAX_FALL = 14;
+        const JUMP_VELOCITY = -11.5;
+        const MOVE_SPEED = 4.5;
+        const ACCEL = 1.0;
+        const FRICTION = 0.7; // Lower is more slippery, higher stops faster
+
+        const CAT_W = 32;
+        const CAT_H = 32;
+
+        const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#d946ef', '#0ea5e9', '#f97316', '#8b5cf6'];
+
+        const STATE = { MENU: 0, PLAYING: 1, DEAD: 2, WON: 3 };
+        let currentState = STATE.MENU;
+        let numPlayers = 2;
+        let currentLevelIndex = 0;
+        let frames = 0;
+
+        // Level Syntax: # = Wall, . = Air, P = Player, D = Door, K = Key, = = Push Block, S = Switch, G = Gate
+        const LEVELS = [
+            // 1. Walk Together
+            [
+                "########################",
+                "#......................#",
+                "#...................D..#",
+                "#..P...................#",
+                "########################"
+            ],
+            // 2. The High Wall (Requires 2 cat stack)
+            [
+                "########################",
+                "#......................#",
+                "#...................D..#",
+                "#.................######",
+                "#..P..............######",
+                "########################"
+            ],
+            // 3. The Gap (Run and Jump)
+            [
+                "########################",
+                "#......................#",
+                "#......................#",
+                "#...................D..#",
+                "#..P......####....######",
+                "##########....####......"
+            ],
+            // 4. Team Jump (Stacking across gaps)
+            [
+                "########################",
+                "#......................#",
+                "#...................D..#",
+                "#...............########",
+                "#..P.......##...########",
+                "##########....##########"
+            ],
+            // 5. Push Box (Introduction)
+            [
+                "########################",
+                "#......................#",
+                "#...................D..#",
+                "#.................######",
+                "#..P.....=........######",
+                "########################"
+            ],
+            // 6. Key Collection
+            [
+                "########################",
+                "#......................#",
+                "#...................D..#",
+                "#............K....######",
+                "#..P......########......",
+                "##########.............."
+            ],
+            // 7. Box Puzzle
+            [
+                "########################",
+                "#...............K......#",
+                "#...................D..#",
+                "#.......######....######",
+                "#..P..=.................",
+                "#######................."
+            ],
+            // 8. Switch Hold
+            [
+                "########################",
+                "#......................#",
+                "#........S........G.D..#",
+                "#..P..#######.....#....#",
+                "######.......######....#"
+            ],
+            // 9. The Pit
+            [
+                "########################",
+                "#...................D..#",
+                "#...................####",
+                "#..P........=.......####",
+                "####....########....####",
+                "####................####"
+            ],
+            // 10. Tower Climb
+            [
+                "########################",
+                "#...................D..#",
+                "#.................######",
+                "#.............##########",
+                "#.........##############",
+                "#..P..=...##############",
+                "########################"
+            ]
+        ];
+
+        let players = [];
+        let solidBlocks = []; // Walls, floors, closed gates
+        let pushBlocks = [];
+        let switches = [];
+        let doors = [];
+        let keys = [];
+
+        let keyCollected = false;
+        let levelHasKey = false;
+        let globalSwitchOn = false;
+
+        // Input State
+        let inputState = Array(8).fill(null).map(() => ({ left: false, right: false, jump: false, jumpPressed: false }));
+        let touchPlayerIndex = 0;
+        let touchState = { left: false, right: false, jump: false };
+        let previousTouchJump = false;
+
+        // Audio System (Synth)
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        function playSound(type) {
+            if (!audioCtx || audioCtx.state !== 'running') return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'jump') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'land') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.05);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'key' || type === 'win') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            }
+        }
+
+        const keysMap = {
+            ArrowLeft: 0, ArrowRight: 0, ArrowUp: 0, // P1
+            a: 1, d: 1, w: 1,                        // P2
+            j: 2, l: 2, i: 2,                        // P3
+            Numpad4: 3, Numpad6: 3, Numpad8: 3       // P4
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyR' && currentState === STATE.PLAYING) { loadLevel(currentLevelIndex); return; }
+
+            const p = keysMap[e.key] !== undefined ? keysMap[e.key] : keysMap[e.code];
+            if (p !== undefined && p < numPlayers) {
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'j' || e.code === 'Numpad4') inputState[p].left = true;
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'l' || e.code === 'Numpad6') inputState[p].right = true;
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'i' || e.code === 'Numpad8') {
+                    inputState[p].jump = true;
+                    inputState[p].jumpPressed = true;
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const p = keysMap[e.key] !== undefined ? keysMap[e.key] : keysMap[e.code];
+            if (p !== undefined && p < numPlayers) {
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'j' || e.code === 'Numpad4') inputState[p].left = false;
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'l' || e.code === 'Numpad6') inputState[p].right = false;
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'i' || e.code === 'Numpad8') {
+                    inputState[p].jump = false;
+                    inputState[p].jumpPressed = false;
+                }
+            }
+        });
+
+        function pollInput() {
+            // Gamepads
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            let gpIdx = 0;
+            for (let i = 0; i < gamepads.length; i++) {
+                const gp = gamepads[i];
+                if (gp && gpIdx < numPlayers) {
+                    let left = gp.axes[0] < -0.5 || gp.buttons[14].pressed;
+                    let right = gp.axes[0] > 0.5 || gp.buttons[15].pressed;
+                    let jump = gp.buttons[0].pressed;
+
+                    inputState[gpIdx].left = inputState[gpIdx].left || left;
+                    inputState[gpIdx].right = inputState[gpIdx].right || right;
+
+                    if (jump && !inputState[gpIdx].jumpPressed) {
+                        inputState[gpIdx].jump = true;
+                        inputState[gpIdx].jumpPressed = true;
+                    } else if (!jump) {
+                        inputState[gpIdx].jumpPressed = false;
+                    }
+                    gpIdx++;
+                }
+            }
+
+            // Touch 
+            if (touchPlayerIndex >= 0 && touchPlayerIndex < numPlayers) {
+                let p = touchPlayerIndex;
+                inputState[p].left = inputState[p].left || touchState.left;
+                inputState[p].right = inputState[p].right || touchState.right;
+
+                if (touchState.jump && !previousTouchJump) {
+                    inputState[p].jump = true;
+                }
+                previousTouchJump = touchState.jump;
+            }
+        }
+
+        function loadLevel(index) {
+            if (index >= LEVELS.length) {
+                currentState = STATE.MENU;
+                document.getElementById('ui-layer').style.display = 'flex';
+                document.getElementById('main-menu').style.display = 'block';
+                document.getElementById('hud').style.display = 'none';
+                return;
+            }
+
+            players = []; solidBlocks = []; pushBlocks = []; switches = []; doors = []; keys = [];
+            keyCollected = false; levelHasKey = false; globalSwitchOn = false;
+
+            const map = LEVELS[index];
+            const mapH = map.length;
+            const mapW = map[0].length;
+
+            // Center level roughly based on canvas size
+            const offsetX = Math.floor((canvas.width - (mapW * TILE)) / 2);
+            const offsetY = Math.floor((canvas.height - (mapH * TILE)) / 2) + 50; // shift down slightly
+
+            let pCount = 0;
+
+            for (let y = 0; y < mapH; y++) {
+                for (let x = 0; x < mapW; x++) {
+                    const char = map[y][x];
+                    const px = offsetX + x * TILE;
+                    const py = offsetY + y * TILE;
+
+                    if (char === '#') {
+                        solidBlocks.push({ x: px, y: py, w: TILE, h: TILE, type: 'wall' });
+                    } else if (char === 'G') {
+                        solidBlocks.push({ x: px, y: py, w: TILE, h: TILE, type: 'gate' });
+                    } else if (char === 'P') {
+                        if (pCount < numPlayers) {
+                            players.push({
+                                id: pCount,
+                                x: px + (pCount * (CAT_W + 5)), // Line them up
+                                y: py + (TILE - CAT_H),
+                                w: CAT_W, h: CAT_H,
+                                vx: 0, vy: 0,
+                                color: COLORS[pCount % COLORS.length],
+                                grounded: false, riding: null, facingRight: true, walkAnim: 0, dead: false
+                            });
+                            pCount++;
+                        }
+                    } else if (char === '=') {
+                        pushBlocks.push({ x: px, y: py, w: TILE, h: TILE, vx: 0, vy: 0, grounded: false, riding: null, isBox: true });
+                    } else if (char === 'D') {
+                        doors.push({ x: px, y: py, w: TILE, h: TILE });
+                    } else if (char === 'K') {
+                        keys.push({ x: px + 12, y: py + 12, w: 24, h: 24 });
+                        levelHasKey = true;
+                    } else if (char === 'S') {
+                        switches.push({ x: px + 4, y: py + TILE - 12, w: TILE - 8, h: 12, active: false });
+                    }
+                }
+            }
+
+            // Spawn missing players if not enough P's
+            while (pCount < numPlayers) {
+                players.push({
+                    id: pCount, x: offsetX + 100, y: offsetY + 100, w: CAT_W, h: CAT_H,
+                    vx: 0, vy: 0, color: COLORS[pCount % COLORS.length], grounded: false, riding: null, facingRight: true, walkAnim: 0, dead: false
+                });
+                pCount++;
+            }
+
+            currentState = STATE.PLAYING;
+            document.getElementById('level-indicator').innerText = `Level ${index + 1}`;
+        }
+
+        function AABB(r1, r2) {
+            return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y;
+        }
+
+        function updatePhysics() {
+            let entities = [...players.filter(p => !p.dead), ...pushBlocks];
+
+            // Switch evaluation
+            globalSwitchOn = false;
+            switches.forEach(sw => {
+                sw.active = false;
+                entities.forEach(ent => {
+                    if (AABB(ent, sw)) { sw.active = true; globalSwitchOn = true; }
+                });
+            });
+
+            let activeSolidBlocks = solidBlocks.filter(b => !(b.type === 'gate' && globalSwitchOn));
+
+            // Reset riding state
+            entities.forEach(e => { e.grounded = false; e.riding = null; });
+
+            // --- Y-AXIS PASS ---
+            entities.forEach(e => {
+                e.vy += GRAVITY;
+                if (e.vy > MAX_FALL) e.vy = MAX_FALL;
+                e.y += e.vy;
+
+                // Block Collisions Y
+                activeSolidBlocks.forEach(b => {
+                    if (AABB(e, b)) {
+                        if (e.vy > 0) { // Landing
+                            e.y = b.y - e.h;
+                            e.vy = 0;
+                            e.grounded = true;
+                        } else if (e.vy < 0) { // Head bump
+                            e.y = b.y + b.h;
+                            e.vy = 0;
+                        }
+                    }
+                });
+            });
+
+            // Entity-Entity Stacking (Y-Axis)
+            // Sort from bottom up to resolve foundations first
+            entities.sort((a, b) => b.y - a.y);
+            for (let pass = 0; pass < 3; pass++) { // Multiple passes ensure tall towers settle
+                for (let i = 0; i < entities.length; i++) {
+                    for (let j = 0; j < entities.length; j++) {
+                        if (i === j) continue;
+                        let bottom = entities[i];
+                        let top = entities[j];
+
+                        if (AABB(bottom, top)) {
+                            // Only stack if 'top' is mostly above 'bottom'
+                            if (top.y + top.h / 2 <= bottom.y + bottom.h / 2) {
+                                top.y = bottom.y - top.h;
+                                top.vy = bottom.vy; // Match falling speed
+                                top.grounded = true;
+                                top.riding = bottom; // Critical for X-axis inheritance
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- X-AXIS PASS ---
+            entities.forEach(e => {
+                // Inherit exact movement from the entity we are riding
+                if (e.riding) {
+                    e.x += e.riding.vx;
+                }
+
+                e.x += e.vx;
+
+                // Friction
+                if (Math.abs(e.vx) > 0.1) e.vx *= FRICTION; else e.vx = 0;
+
+                // Block Collisions X
+                activeSolidBlocks.forEach(b => {
+                    if (AABB(e, b)) {
+                        if (e.vx > 0 || (e.riding && e.riding.vx > 0)) {
+                            e.x = b.x - e.w;
+                        } else {
+                            e.x = b.x + b.w;
+                        }
+                        e.vx = 0;
+                    }
+                });
+            });
+
+            // Entity-Entity Pushing (X-Axis)
+            for (let pass = 0; pass < 2; pass++) {
+                for (let i = 0; i < entities.length; i++) {
+                    for (let j = 0; j < entities.length; j++) {
+                        if (i === j) continue;
+                        let p1 = entities[i];
+                        let p2 = entities[j];
+
+                        if (AABB(p1, p2)) {
+                            // Only push horizontally if they are roughly on the same vertical plane
+                            if (Math.abs(p1.y - p2.y) < p1.h - 10) {
+                                // Calculate overlap
+                                let overlapLeft = (p1.x + p1.w) - p2.x;
+                                let overlapRight = (p2.x + p2.w) - p1.x;
+
+                                if (overlapLeft < overlapRight && p1.x < p2.x) {
+                                    p1.x -= overlapLeft / 2; p2.x += overlapLeft / 2;
+                                    p2.vx = p1.vx; // transfer momentum
+                                } else if (overlapRight < overlapLeft && p1.x > p2.x) {
+                                    p1.x += overlapRight / 2; p2.x -= overlapRight / 2;
+                                    p2.vx = p1.vx;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Final safety boundary check for X to prevent getting pushed into walls
+            entities.forEach(e => {
+                activeSolidBlocks.forEach(b => {
+                    if (AABB(e, b)) {
+                        if (e.x + e.w / 2 < b.x + b.w / 2) e.x = b.x - e.w;
+                        else e.x = b.x + b.w;
+                        e.vx = 0;
+                    }
+                });
+            });
+        }
+
+        function update() {
+            if (currentState !== STATE.PLAYING) return;
+            frames++;
+
+            pollInput();
+
+            // Process Player Intent
+            players.filter(p => !p.dead).forEach(p => {
+                let input = inputState[p.id];
+
+                if (input.left) { p.vx -= ACCEL; p.facingRight = false; p.walkAnim += 0.2; }
+                if (input.right) { p.vx += ACCEL; p.facingRight = true; p.walkAnim += 0.2; }
+                if (!input.left && !input.right) p.walkAnim = 0;
+
+                if (p.vx > MOVE_SPEED) p.vx = MOVE_SPEED;
+                if (p.vx < -MOVE_SPEED) p.vx = -MOVE_SPEED;
+
+                if (input.jump && p.grounded) {
+                    p.vy = JUMP_VELOCITY;
+                    // Add momentum from whatever we are standing on (so jumps out of moving stacks work)
+                    if (p.riding) p.vx += p.riding.vx;
+                    p.grounded = false;
+                    playSound('jump');
+                }
+                input.jump = false; // consume jump to require re-press
+            });
+
+            updatePhysics();
+
+            // Key Logic
+            keys = keys.filter(k => {
+                if (!keyCollected && players.some(p => !p.dead && AABB(p, k))) {
+                    keyCollected = true;
+                    playSound('key');
+                    return false;
+                }
+                return true;
+            });
+
+            // Win Condition Logic
+            // Door unlocks if no keys are in the level, OR if the key was collected
+            let doorUnlocked = !levelHasKey || keyCollected;
+
+            if (doorUnlocked && doors.length > 0) {
+                let door = doors[0];
+                // Create a large detection zone around the door
+                let winZone = { x: door.x - 20, y: door.y - 300, w: door.w + 40, h: door.h + 300 };
+
+                let livingPlayers = players.filter(p => !p.dead);
+                // Ensure ALL living players are in the win zone
+                let allAtDoor = livingPlayers.length > 0 && livingPlayers.every(p => AABB(p, winZone));
+
+                if (allAtDoor) {
+                    currentState = STATE.WON;
+                    playSound('win');
+                    document.getElementById('ui-layer').style.display = 'flex';
+                    document.getElementById('message-overlay').style.display = 'block';
+                    document.getElementById('hud').style.display = 'none';
+                }
+            }
+
+            // Death / Pit Fall
+            players.forEach(p => {
+                if (!p.dead && p.y > canvas.height + 200) {
+                    loadLevel(currentLevelIndex); // Instant restart for now to keep pacing fast
+                }
+            });
+        }
+
+        function drawCat(p) {
+            if (p.dead) return;
+            ctx.fillStyle = p.color;
+
+            // Animation bounce
+            let bounce = (p.walkAnim > 0 && p.grounded) ? Math.abs(Math.sin(p.walkAnim)) * 4 : 0;
+            let py = p.y - bounce;
+            let px = p.x;
+
+            // Body
+            ctx.fillRect(px + 4, py + 8, p.w - 8, p.h - 8);
+
+            // Ears
+            ctx.beginPath();
+            ctx.moveTo(px + 4, py + 8);
+            ctx.lineTo(px + 10, py);
+            ctx.lineTo(px + 14, py + 8);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(px + p.w - 4, py + 8);
+            ctx.lineTo(px + p.w - 10, py);
+            ctx.lineTo(px + p.w - 14, py + 8);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = 'white';
+            let eyeOff = p.facingRight ? 4 : -4;
+            ctx.fillRect(px + 8 + eyeOff, py + 14, 6, 6);
+            ctx.fillRect(px + 18 + eyeOff, py + 14, 6, 6);
+
+            // Pupils
+            ctx.fillStyle = 'black';
+            let pupOff = p.facingRight ? 2 : 0;
+            ctx.fillRect(px + 10 + eyeOff + pupOff, py + 16, 2, 4);
+            ctx.fillRect(px + 20 + eyeOff + pupOff, py + 16, 2, 4);
+        }
+
+        function draw() {
+            // Clear background
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (currentState === STATE.MENU) return;
+
+            // Draw Blocks
+            solidBlocks.forEach(b => {
+                if (b.type === 'wall') {
+                    ctx.fillStyle = '#334155'; ctx.fillRect(b.x, b.y, b.w, b.h);
+                    ctx.fillStyle = '#475569'; ctx.fillRect(b.x + 4, b.y + 4, b.w - 8, b.h - 8);
+                } else if (b.type === 'gate') {
+                    ctx.fillStyle = '#64748b'; ctx.fillRect(b.x, b.y, b.w, b.h);
+                    ctx.fillStyle = '#ef4444'; ctx.fillRect(b.x + b.w / 2 - 2, b.y, 4, b.h);
+                }
+            });
+
+            // Switches
+            switches.forEach(sw => {
+                ctx.fillStyle = sw.active ? '#22c55e' : '#ef4444';
+                ctx.fillRect(sw.x, sw.y + (sw.active ? 8 : 0), sw.w, sw.h - (sw.active ? 8 : 0));
+                ctx.fillStyle = '#1e293b'; ctx.fillRect(sw.x - 2, sw.y + sw.h, sw.w + 4, 4);
+            });
+
+            // Push Blocks
+            pushBlocks.forEach(pb => {
+                ctx.fillStyle = '#b45309'; ctx.fillRect(pb.x, pb.y, pb.w, pb.h);
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 3; ctx.strokeRect(pb.x + 3, pb.y + 3, pb.w - 6, pb.h - 6);
+                // Crate details
+                ctx.beginPath(); ctx.moveTo(pb.x + 3, pb.y + 3); ctx.lineTo(pb.x + pb.w - 3, pb.y + pb.h - 3); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(pb.x + pb.w - 3, pb.y + 3); ctx.lineTo(pb.x + 3, pb.y + pb.h - 3); ctx.stroke();
+            });
+
+            // Doors
+            doors.forEach(d => {
+                let isLocked = levelHasKey && !keyCollected;
+                ctx.fillStyle = isLocked ? '#000000' : '#8b5cf6';
+                ctx.fillRect(d.x, d.y, d.w, d.h);
+                ctx.strokeStyle = isLocked ? '#333' : '#d8b4fe';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(d.x + 2, d.y + 2, d.w - 4, d.h - 4);
+
+                if (isLocked) { // Draw keyhole
+                    ctx.fillStyle = '#555';
+                    ctx.beginPath(); ctx.arc(d.x + d.w / 2, d.y + d.h / 2 - 5, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillRect(d.x + d.w / 2 - 3, d.y + d.h / 2 - 2, 6, 10);
+                }
+            });
+
+            // Keys
+            keys.forEach(k => {
+                let floatY = Math.sin(frames * 0.1) * 5;
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath(); ctx.arc(k.x + k.w / 2, k.y + floatY, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.fillRect(k.x + k.w / 2, k.y + floatY - 2, 14, 4);
+                ctx.fillRect(k.x + k.w / 2 + 6, k.y + floatY, 4, 8);
+                ctx.fillRect(k.x + k.w / 2 + 10, k.y + floatY, 4, 6);
+            });
+
+            // Players
+            players.forEach(p => drawCat(p));
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function setupUI() {
+            // Player Selector
+            const pSelector = document.getElementById('player-selector');
+            for (let i = 2; i <= 8; i++) {
+                let btn = document.createElement('div');
+                btn.className = `player-btn ${i === 2 ? 'selected' : ''}`;
+                btn.innerText = i;
+                btn.onclick = () => {
+                    document.querySelectorAll('.player-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    numPlayers = i;
+                };
+                pSelector.appendChild(btn);
+            }
+
+            // Touch Event Hookups
+            const addTouch = (id, action) => {
+                const el = document.getElementById(id);
+                const handleDown = (e) => { e.preventDefault(); touchState[action] = true; };
+                const handleUp = (e) => { e.preventDefault(); touchState[action] = false; };
+                el.addEventListener('touchstart', handleDown, { passive: false });
+                el.addEventListener('touchend', handleUp, { passive: false });
+                el.addEventListener('mousedown', handleDown);
+                window.addEventListener('mouseup', handleUp);
+            };
+            addTouch('btn-left', 'left');
+            addTouch('btn-right', 'right');
+            addTouch('btn-jump', 'jump');
+
+            // Layout Select
+            document.getElementById('touch-layout-select').addEventListener('change', (e) => {
+                document.getElementById('touch-controls').className = e.target.value;
+            });
+
+            // Start
+            document.getElementById('btn-start').onclick = () => {
+                initAudio();
+                currentLevelIndex = parseInt(document.getElementById('level-select').value);
+                touchPlayerIndex = parseInt(document.getElementById('touch-player-select').value);
+
+                document.getElementById('ui-layer').style.display = 'none';
+                document.getElementById('hud').style.display = 'flex';
+                document.getElementById('touch-controls').style.display = touchPlayerIndex >= 0 ? 'flex' : 'none';
+
+                loadLevel(currentLevelIndex);
+            };
+
+            // Next Level
+            document.getElementById('btn-next').onclick = () => {
+                document.getElementById('ui-layer').style.display = 'none';
+                document.getElementById('message-overlay').style.display = 'none';
+                document.getElementById('hud').style.display = 'flex';
+                currentLevelIndex++;
+                loadLevel(currentLevelIndex);
+            };
+
+            // Restart Level
+            document.getElementById('btn-restart').onclick = () => {
+                loadLevel(currentLevelIndex);
+            };
+        }
+
+        setupUI();
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+
+</html>
