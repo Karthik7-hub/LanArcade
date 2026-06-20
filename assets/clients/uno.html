@@ -686,9 +686,87 @@
             flex-shrink: 0;
             transition: all 0.3s;
         }
+
+        /* --- AUDIO UNLOCK OVERLAY --- */
+        #audio-unlock-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, #1e293b, #020617);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            cursor: pointer;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+        .unlock-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2.5rem 2rem;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            max-width: 90%;
+            width: 380px;
+            transform: scale(0.95);
+            animation: cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes cardEntrance {
+            to { transform: scale(1); }
+        }
+        .unlock-logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: pulseLogo 2s infinite ease-in-out;
+        }
+        @keyframes pulseLogo {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .unlock-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .unlock-subtitle {
+            font-size: 0.95rem;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+        .unlock-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 999px;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+            transition: all 0.2s;
+        }
+        .unlock-btn:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
+
+    <!-- Audio Unlock Overlay -->
+    <div id="audio-unlock-overlay">
+        <div class="unlock-card">
+            <div class="unlock-logo">🎮</div>
+            <h1 class="unlock-title">LAN ARCADE</h1>
+            <p class="unlock-subtitle">Ready to play? Tap anywhere to unlock audio and start the game.</p>
+            <button class="unlock-btn">TAP TO PLAY</button>
+        </div>
+    </div>
 
     <div id="game-screen">
         <!-- Leaderboard Toggle & Panel -->
@@ -700,7 +778,7 @@
             </div>
         </div>
         
-        <div style="position: absolute; top: 12px; right: 12px; z-index: 20; display: flex; flex-direction: column; gap: 4px;">
+        <div style="position: absolute; top: 12px; right: 64px; z-index: 20; display: flex; flex-direction: column; gap: 4px;">
             <div class="status-badge" id="timer-indicator" style="display: none;">⏳ 0s</div>
         </div>
 
@@ -779,6 +857,7 @@
 
         // --- LEADERBOARD FUNCTIONS ---
         function toggleLeaderboard() {
+            ensureAudioResumed();
             lbOpen = !lbOpen;
             const panel = document.getElementById('leaderboard-panel');
             if (lbOpen) {
@@ -947,6 +1026,7 @@
 
         // --- BUTTON HANDLERS ---
         function playCard(idx) {
+            ensureAudioResumed();
             if (!Arcade) return;
             const privateState = Arcade.getPrivateState();
             if (!privateState || !privateState.hand) return;
@@ -986,12 +1066,14 @@
         });
 
         function chooseColor(color) {
+            ensureAudioResumed();
             safeAction('PLAY_CARD', { cardIndex: pendingCardIdx, chosenColor: color });
             document.getElementById('color-picker').style.display = 'none';
             pendingCardIdx = null;
         }
 
         function showSwapPlayerPicker() {
+            ensureAudioResumed();
             if (!Arcade) return;
             const room = Arcade.getRoom();
             const player = Arcade.getPlayer();
@@ -1022,6 +1104,7 @@
         }
 
         function handleDrawAction() {
+            ensureAudioResumed();
             if (!Arcade) return;
             const publicState = Arcade.getPublicState();
             const player = Arcade.getPlayer();
@@ -1030,6 +1113,7 @@
         }
 
         function callUno() {
+            ensureAudioResumed();
             if (!Arcade) return;
             const publicState = Arcade.getPublicState();
             const player = Arcade.getPlayer();
@@ -1052,36 +1136,251 @@
             cardCounts: {}
         };
 
-        const sfx = {
-            start: new Audio('start.wav'),
-            play: new Audio('play.wav'),
-            draw: new Audio('draw.wav'),
-            penalty: new Audio('penalty.wav'),
-            skip: new Audio('skip.wav'),
-            reverse: new Audio('reverse.wav'),
-            swap: new Audio('swap.wav'),
-            turn: new Audio('turn.wav'),
-            win: new Audio('win.wav')
-        };
+        // --- WEB AUDIO API SFX SYSTEM (MOBILE OPTIMIZED WITH OVERLAY & VERBOSE LOGS) ---
+        let audioCtx = null;
+        let audioUnlocked = false;
 
-        // Preload sound files
-        Object.keys(sfx).forEach(key => {
-            sfx[key].volume = 0.8;
-            sfx[key].load();
+        const rawBuffers = {};
+        const sfxBuffers = {};
+        const sfxNames = ['start', 'play', 'draw', 'penalty', 'skip', 'reverse', 'swap', 'turn', 'win'];
+
+        // Determine base URL dynamically for bulletproof asset paths
+        const baseHref = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+        console.log(`[Audio] Dynamic base path identified: ${baseHref}`);
+
+        // Try to create AudioContext early to check state. If it returns 'running', we can auto-unlock.
+        try {
+            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtxClass) {
+                audioCtx = new AudioCtxClass();
+                console.log(`[Audio] AudioContext created on early check. Initial state: ${audioCtx.state}`);
+                
+                audioCtx.onstatechange = () => {
+                    console.log(`[Audio] AudioContext state changed to: ${audioCtx.state}`);
+                };
+
+                if (audioCtx.state === 'running') {
+                    console.log("[Audio] AudioContext is running immediately (autoplay allowed). Hiding overlay.");
+                    audioUnlocked = true;
+                    // Run this after DOM is ready or immediately if already loaded
+                    const hideOverlay = () => {
+                        const overlay = document.getElementById('audio-unlock-overlay');
+                        if (overlay) overlay.style.display = 'none';
+                    };
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', hideOverlay);
+                    } else {
+                        hideOverlay();
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[Audio] Could not pre-instantiate AudioContext on load (expected on mobile):", e);
+        }
+
+        // Load all sounds via Fetch as raw ArrayBuffers immediately (cached via standard 200 OK headers)
+        sfxNames.forEach(name => {
+            const sfxUrl = baseHref + `${name}.wav`;
+            console.log(`[Audio] Fetching SFX: ${name} from URL: ${sfxUrl}`);
+            fetch(sfxUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+                    return response.arrayBuffer();
+                })
+                .then(arrayBuffer => {
+                    rawBuffers[name] = arrayBuffer;
+                    console.log(`[Audio] Pre-fetched raw buffer for SFX: ${name} (${arrayBuffer.byteLength} bytes)`);
+                    // If audioCtx is already initialized and running, decode immediately
+                    if (audioCtx && audioCtx.state !== 'suspended') {
+                        decodeSfx(name, arrayBuffer);
+                    }
+                })
+                .catch(err => {
+                    console.error(`[Audio] Failed to fetch SFX: ${name} from URL ${sfxUrl}. Error:`, err);
+                });
         });
+
+        function decodeSfx(name, arrayBuffer) {
+            if (!audioCtx) {
+                console.warn(`[Audio] Cannot decode SFX ${name}: AudioContext is not initialized.`);
+                return;
+            }
+            try {
+                console.log(`[Audio] Starting decodeAudioData for SFX: ${name}`);
+                // Slice the buffer because decodeAudioData neuters the source buffer
+                audioCtx.decodeAudioData(
+                    arrayBuffer.slice(0),
+                    audioBuffer => {
+                        sfxBuffers[name] = audioBuffer;
+                        console.log(`[Audio] Successfully decoded SFX: ${name}`);
+                    },
+                    err => {
+                        console.error(`[Audio] decodeAudioData failed for SFX ${name}:`, err);
+                    }
+                );
+            } catch (e) {
+                console.error(`[Audio] Exception in decodeSfx for ${name}:`, e);
+            }
+        }
 
         function playSound(name) {
             try {
                 const key = name.replace('.wav', '');
-                const audio = sfx[key];
-                if (audio) {
-                    audio.currentTime = 0; // Rewind to start to handle quick successive actions
-                    audio.play().catch(e => console.warn("Audio playback blocked or failed:", e));
+                const buffer = sfxBuffers[key];
+                
+                console.log(`[Audio] Playback request: ${key}. State: ${audioCtx ? audioCtx.state : 'null'}, Buffer exists: ${!!buffer}`);
+
+                if (!audioCtx) {
+                    console.warn(`[Audio] AudioContext not initialized yet. Sound deferred: ${name}`);
+                    return;
+                }
+
+                if (audioCtx.state === 'suspended') {
+                    console.log("[Audio] AudioContext is suspended. Attempting to resume...");
+                    audioCtx.resume().then(() => {
+                        console.log(`[Audio] AudioContext resumed during playSound. State: ${audioCtx.state}`);
+                        if (buffer) {
+                            playBuffer(buffer);
+                        }
+                    }).catch(err => {
+                        console.error("[Audio] Failed to resume AudioContext inside playSound:", err);
+                    });
+                } else if (buffer) {
+                    playBuffer(buffer);
+                } else {
+                    console.warn(`[Audio] SFX buffer not ready/decoded yet for: ${key}`);
                 }
             } catch(e) {
-                console.warn("Could not play sound:", e);
+                console.error("[Audio] Could not play sound via Web Audio API:", e);
             }
         }
+
+        function playBuffer(buffer) {
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start(0);
+            console.log("[Audio] Sound playback triggered successfully.");
+        }
+
+        function ensureAudioResumed() {
+            if (!audioCtx) {
+                unlockAudioContext();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    console.log(`[Audio] AudioContext resumed in ensureAudioResumed. State: ${audioCtx.state}`);
+                });
+            }
+        }
+
+        // Prime the browser's audio session using a silent HTML5 Audio element and setting playback category
+        function primeAudioSession() {
+            console.log("[Audio] Priming audio session...");
+            try {
+                if (navigator.audioSession) {
+                    navigator.audioSession.type = 'playback';
+                    console.log("[Audio] Set navigator.audioSession.type to playback");
+                }
+            } catch (e) {
+                console.warn("[Audio] navigator.audioSession not supported:", e);
+            }
+
+            try {
+                // Play a tiny silent base64 WAV file to kick the iOS audio session into media playback mode
+                const silence = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAAA');
+                silence.play().then(() => {
+                    console.log("[Audio] Silent audio session kick played successfully");
+                }).catch(e => {
+                    console.warn("[Audio] Failed to play silent audio kick (expected if no interaction yet):", e);
+                });
+            } catch (e) {
+                console.warn("[Audio] Exception playing silent audio kick:", e);
+            }
+        }
+
+        // Unlock Audio Context on first touch or click
+        function unlockAudioContext(e) {
+            console.log(`[Audio] unlockAudioContext invoked by event: ${e ? e.type : 'manual'}`);
+            if (audioUnlocked) {
+                console.log("[Audio] Already unlocked. Skipping.");
+                return;
+            }
+            
+            try {
+                // Initialize context if not already created
+                if (!audioCtx) {
+                    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtxClass) {
+                        audioCtx = new AudioCtxClass();
+                        console.log(`[Audio] AudioContext created inside user gesture. State: ${audioCtx.state}`);
+                        
+                        audioCtx.onstatechange = () => {
+                            console.log(`[Audio] AudioContext state change detected: ${audioCtx.state}`);
+                        };
+                    } else {
+                        console.error("[Audio] Web Audio API not supported.");
+                        return;
+                    }
+                }
+
+                // Decode all raw buffers that are already loaded
+                console.log(`[Audio] Decoding raw buffers: ${Object.keys(rawBuffers).length} available.`);
+                Object.keys(rawBuffers).forEach(name => {
+                    if (!sfxBuffers[name]) {
+                        decodeSfx(name, rawBuffers[name]);
+                    }
+                });
+
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(() => {
+                        console.log(`[Audio] AudioContext resumed successfully via user gesture. State: ${audioCtx.state}`);
+                    }).catch(err => {
+                        console.error("[Audio] Failed to resume AudioContext on user gesture:", err);
+                    });
+                }
+
+                primeAudioSession();
+
+                // Play a short silent buffer to fully prime/unlock on iOS Safari
+                try {
+                    const buffer = audioCtx.createBuffer(1, 1, 22050);
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioCtx.destination);
+                    source.start(0);
+                    console.log("[Audio] Silent buffer primed and played.");
+                } catch (err) {
+                    console.warn("[Audio] Failed to play silent buffer:", err);
+                }
+
+                // Hide overlay with fade out
+                const overlay = document.getElementById('audio-unlock-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    overlay.style.pointerEvents = 'none';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                    }, 300);
+                }
+
+                audioUnlocked = true;
+                
+                // Remove interaction event listeners
+                const events = ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown', 'keydown'];
+                events.forEach(evt => {
+                    document.removeEventListener(evt, unlockAudioContext, true);
+                });
+                console.log("[Audio] All interaction listeners removed.");
+            } catch (err) {
+                console.error("[Audio] Exception in unlockAudioContext:", err);
+            }
+        }
+
+        // Register all possible user gesture events to unlock AudioContext
+        const unlockEvents = ['click', 'touchstart', 'touchend', 'pointerdown', 'mousedown', 'keydown'];
+        unlockEvents.forEach(evt => {
+            document.addEventListener(evt, unlockAudioContext, true);
+        });
 
         // --- UPDATE LAYOUT & RENDER HANDS ---
         function updateUI() {

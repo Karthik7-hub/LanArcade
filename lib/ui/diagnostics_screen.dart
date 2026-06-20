@@ -18,6 +18,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   @override
   void initState() {
     super.initState();
+    _status = widget.kernel.status;
+    _logs.addAll(widget.kernel.logHistory);
     _subscription = widget.kernel.statsStream.listen((event) {
       if (mounted) {
         setState(() {

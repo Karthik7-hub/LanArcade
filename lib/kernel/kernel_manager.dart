@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
@@ -21,6 +22,26 @@ class KernelManager {
   final _statsController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get statsStream => _statsController.stream;
 
+  final List<String> _logHistory = [];
+  List<String> get logHistory => List.unmodifiable(_logHistory);
+
+  String _status = 'OFFLINE';
+  String get status => _status;
+
+  void _addStats(Map<String, dynamic> event) {
+    if (event.containsKey('status')) {
+      _status = event['status'].toString().toUpperCase();
+    }
+    if (event.containsKey('log')) {
+      final logText = event['log'].toString();
+      _logHistory.insert(0, logText);
+      if (_logHistory.length > 100) {
+        _logHistory.removeLast();
+      }
+    }
+    _statsController.add(event);
+  }
+
   AppDatabase get db {
     _db ??= AppDatabase();
     return _db!;
@@ -31,12 +52,12 @@ class KernelManager {
   Future<void> start() async {
     if (_runtime?.isRunning == true) return;
 
-    _statsController.add({'log': 'SERVER_START_REQUESTED', 'status': 'starting'});
+    _addStats({'log': 'SERVER_START_REQUESTED', 'status': 'starting'});
 
     try {
-      _statsController.add({'log': 'EXTRACTING_ASSETS...'});
+      _addStats({'log': 'EXTRACTING_ASSETS...'});
       final webPath = await AssetExtractor.extractShellAssets();
-      _statsController.add({'log': 'ASSETS_READY: $webPath'});
+      _addStats({'log': 'ASSETS_READY: $webPath'});
 
       final roomService = RoomService(db);
       final pluginManager = PluginManager();
@@ -49,7 +70,7 @@ class KernelManager {
 
       // Forward stats from the runtime
       _runtime!.statsStream.listen((event) {
-        _statsController.add(event);
+        _addStats(event);
       });
 
       await _runtime!.start(webPath);
@@ -58,7 +79,7 @@ class KernelManager {
       // Start background auto cleanup timer
       _startAutoCleanupTimer();
     } catch (e) {
-      _statsController.add({
+      _addStats({
         'log': 'SERVER_FAILED: $e',
         'status': 'error',
         'error': e.toString(),
@@ -76,7 +97,7 @@ class KernelManager {
       _runtime = null;
       await ForegroundServiceManager.stop();
     }
-    _statsController.add({'status': 'stopped', 'log': 'SERVER_STOPPED'});
+    _addStats({'status': 'stopped', 'log': 'SERVER_STOPPED'});
   }
 
   Future<void> dispose() async {
@@ -169,6 +190,46 @@ class KernelManager {
     await (db.delete(db.rooms)..where((t) => t.id.equals(roomId))).go();
   }
 
+  Future<List<RoomStorageDetail>> getRoomStorageDetails() async {
+    final dbRooms = await db.select(db.rooms).get();
+    final list = <RoomStorageDetail>[];
+    for (final r in dbRooms) {
+      int playersCount = 0;
+      try {
+        final List players = jsonDecode(r.playersJson) as List;
+        playersCount = players.length;
+      } catch (_) {}
+      
+      final isActiveInMemory = _runtime?.activeEngines.containsKey(r.id) ?? false;
+      
+      list.add(RoomStorageDetail(
+        id: r.id,
+        code: r.code,
+        gameId: r.gameId,
+        hostId: r.hostId,
+        playersCount: playersCount,
+        status: r.status,
+        createdAt: r.createdAt,
+        lastActiveAt: r.lastActiveAt,
+        isActiveInMemory: isActiveInMemory,
+      ));
+    }
+    // Sort by last active or created at (newest first)
+    list.sort((a, b) {
+      final tA = a.lastActiveAt ?? a.createdAt;
+      final tB = b.lastActiveAt ?? b.createdAt;
+      return tB.compareTo(tA);
+    });
+    return list;
+  }
+
+  Future<void> deleteRoom(String roomId) async {
+    if (_runtime != null) {
+      _runtime!.evictRoom(roomId);
+    }
+    await _deleteRoomData(roomId);
+  }
+
   // --- Automatic Cleanup Configurations & Timer Loops ---
 
   void _startAutoCleanupTimer() {
@@ -232,6 +293,30 @@ class KernelManager {
       _startAutoCleanupTimer();
     }
   }
+}
+
+class RoomStorageDetail {
+  final String id;
+  final String code;
+  final String gameId;
+  final String hostId;
+  final int playersCount;
+  final RoomStatus status;
+  final DateTime createdAt;
+  final DateTime? lastActiveAt;
+  final bool isActiveInMemory;
+
+  RoomStorageDetail({
+    required this.id,
+    required this.code,
+    required this.gameId,
+    required this.hostId,
+    required this.playersCount,
+    required this.status,
+    required this.createdAt,
+    this.lastActiveAt,
+    required this.isActiveInMemory,
+  });
 }
 
 

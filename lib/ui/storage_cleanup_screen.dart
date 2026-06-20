@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../kernel/kernel_manager.dart';
 import '../kernel/cleanup_settings.dart';
+import '../shared/models.dart';
 import 'theme.dart';
 
 class StorageCleanupScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class StorageCleanupScreen extends StatefulWidget {
 class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   bool _isLoading = true;
   Map<String, dynamic> _stats = {};
+  List<RoomStorageDetail> _rooms = [];
 
   // Auto-cleanup dropdown selections
   bool _autoCleanup = true;
@@ -35,6 +37,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
 
     final stats = await widget.kernel.getStorageStats();
     final settings = await widget.kernel.getCleanupSettings();
+    final rooms = await widget.kernel.getRoomStorageDetails();
 
     setState(() {
       _stats = stats;
@@ -42,6 +45,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       _completedDays = settings.completedMatchesDays;
       _abandonedHours = settings.abandonedRoomsHours;
       _reconnectHours = settings.reconnectStatesHours;
+      _rooms = rooms;
       _isLoading = false;
     });
   }
@@ -246,12 +250,239 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                   const SizedBox(height: 24),
                   _buildCleanupActions(),
                   const SizedBox(height: 24),
+                  _buildRoomsListSection(),
+                  const SizedBox(height: 24),
                   _buildDangerZone(),
                   const SizedBox(height: 40),
                 ],
               ),
             ),
     );
+  }
+
+  Widget _buildRoomsListSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.grid_view_rounded, color: ArcadeTheme.secondaryColor),
+                const SizedBox(width: 12),
+                Text(
+                  'ROOM STORAGE MANAGEMENT',
+                  style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_rooms.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No rooms currently stored in the database.',
+                    style: TextStyle(color: Colors.white38, fontSize: 13, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _rooms.length,
+                separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 24),
+                itemBuilder: (context, index) {
+                  final room = _rooms[index];
+                  return _buildRoomRow(room);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getGameName(String gameId) {
+    final games = widget.kernel.availableGames;
+    for (final g in games) {
+      if (g.id == gameId) return g.name;
+    }
+    if (gameId.isEmpty) return 'Unknown Game';
+    return gameId[0].toUpperCase() + gameId.substring(1);
+  }
+
+  Widget _buildRoomRow(RoomStorageDetail room) {
+    Color statusColor;
+    String statusLabel;
+    switch (room.status) {
+      case RoomStatus.waiting:
+        statusColor = Colors.blueAccent;
+        statusLabel = 'WAITING';
+        break;
+      case RoomStatus.active:
+        statusColor = Colors.greenAccent;
+        statusLabel = 'ACTIVE';
+        break;
+      case RoomStatus.finished:
+        statusColor = Colors.grey;
+        statusLabel = 'FINISHED';
+        break;
+      case RoomStatus.abandoned:
+        statusColor = Colors.redAccent;
+        statusLabel = 'ABANDONED';
+        break;
+    }
+
+    final gameName = _getGameName(room.gameId);
+    final formattedTime = room.lastActiveAt != null
+        ? 'Active: ${_formatDateTime(room.lastActiveAt!)}'
+        : 'Created: ${_formatDateTime(room.createdAt)}';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    room.code.toUpperCase(),
+                    style: GoogleFonts.firaCode(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: ArcadeTheme.primaryColor,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '($gameName)',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  _buildBadge(statusLabel, statusColor),
+                  const SizedBox(width: 6),
+                  if (room.isActiveInMemory)
+                    _buildBadge('IN-MEMORY', ArcadeTheme.accentColor)
+                  else
+                    _buildBadge('DB ONLY', Colors.white30),
+                  const SizedBox(width: 8),
+                  Icon(Icons.people_alt_rounded, size: 12, color: Colors.white.withValues(alpha: 0.4)),
+                  const SizedBox(width: 4),
+                  Text('${room.playersCount} Players', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                formattedTime,
+                style: const TextStyle(color: Colors.white30, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent, size: 24),
+          onPressed: () => _confirmPurgeRoom(room),
+          tooltip: 'Purge Room Storage',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        border: Border.all(color: color, width: 1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) {
+      return 'just now';
+    } else if (diff.inHours < 1) {
+      return '${diff.inMinutes}m ago';
+    } else if (diff.inDays < 1) {
+      return '${diff.inHours}h ago';
+    } else {
+      return '${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
+  Future<void> _confirmPurgeRoom(RoomStorageDetail room) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: ArcadeTheme.surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Colors.redAccent, width: 1),
+        ),
+        title: Text(
+          'PURGE ROOM STORAGE',
+          style: GoogleFonts.blackOpsOne(
+            color: Colors.redAccent,
+            fontSize: 20,
+            letterSpacing: 1,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to permanently delete Room ${room.code.toUpperCase()}?\n\n'
+          'All database logs and in-memory game state will be destroyed immediately. Any active players will be returned to the lobby.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('CANCEL', style: TextStyle(color: Colors.white30, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('PURGE', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isLoading = true;
+      });
+      await widget.kernel.deleteRoom(room.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Room ${room.code.toUpperCase()} purged successfully.'),
+          backgroundColor: ArcadeTheme.accentColor,
+        ),
+      );
+      _loadData();
+    }
   }
 
   Widget _buildStatsSection() {

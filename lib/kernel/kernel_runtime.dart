@@ -56,6 +56,9 @@ class KernelRuntime {
     _statsController.add({
       'log': 'PLUGINS_LOADED: ${pluginManager.availableGames.length} games found'
     });
+    for (final game in pluginManager.availableGames) {
+      await AssetExtractor.extractGameAssets(game.id);
+    }
 
     // Recovery logic
     await _recoverRooms();
@@ -97,6 +100,9 @@ class KernelRuntime {
       final filePath = (file.isEmpty || file == '/') ? 'index.html' : file;
       final fileToServe = File(p.join(gamePath, filePath));
       if (!await fileToServe.exists()) {
+        await AssetExtractor.extractGameAssets(gameId);
+      }
+      if (!await fileToServe.exists()) {
         return Response.notFound('File not found');
       }
       final bytes = await fileToServe.readAsBytes();
@@ -117,7 +123,14 @@ class KernelRuntime {
       } else if (filePath.endsWith('.ogg')) {
         contentType = 'audio/ogg';
       }
-      return Response.ok(bytes, headers: {'content-type': contentType});
+      
+      final headers = <String, String>{
+        'content-type': contentType,
+      };
+      if (filePath.endsWith('.wav') || filePath.endsWith('.mp3') || filePath.endsWith('.ogg') || filePath.endsWith('.png')) {
+        headers['cache-control'] = 'public, max-age=31536000, immutable';
+      }
+      return Response.ok(bytes, headers: headers);
     });
 
     // WebSocket Handler
@@ -837,6 +850,17 @@ class KernelRuntime {
       _log.info('Destroying room ${room.code}');
       await roomService.updateStatus(roomId, models.RoomStatus.abandoned);
     }
+  }
+
+  void evictRoom(String roomId) {
+    final engine = activeEngines.remove(roomId);
+    if (engine != null) {
+      _log.info('Disposing JsEngine for evicted room $roomId');
+      engine.dispose();
+    }
+    roomData.remove(roomId);
+    _cleanupTimers.remove(roomId)?.cancel();
+    connectionManager.evictRoom(roomId);
   }
 
   void dispose() {

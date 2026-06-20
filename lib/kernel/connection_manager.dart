@@ -64,6 +64,15 @@ class ConnectionManager {
     }
   }
 
+  void evictRoom(String roomId) {
+    for (var conn in _connections.values) {
+      if (conn.roomId == roomId) {
+        conn.send('room.update', null);
+        conn.roomId = null;
+      }
+    }
+  }
+
   void closeAll() {
     for (var conn in _connections.values) {
       try {
