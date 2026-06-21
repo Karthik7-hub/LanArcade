@@ -271,9 +271,12 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               children: [
                 const Icon(Icons.grid_view_rounded, color: ArcadeTheme.secondaryColor),
                 const SizedBox(width: 12),
-                Text(
-                  'ROOM STORAGE MANAGEMENT',
-                  style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
+                Expanded(
+                  child: Text(
+                    'ROOM STORAGE MANAGEMENT',
+                    style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -360,9 +363,12 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    '($gameName)',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                  Expanded(
+                    child: Text(
+                      '($gameName)',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -543,15 +549,20 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.auto_delete_outlined, color: ArcadeTheme.accentColor),
-                    const SizedBox(width: 12),
-                    Text(
-                      'AUTOMATIC CLEANUP',
-                      style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.auto_delete_outlined, color: ArcadeTheme.accentColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'AUTOMATIC CLEANUP',
+                          style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Switch(
                   value: _autoCleanup,
@@ -680,9 +691,12 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               children: [
                 const Icon(Icons.cleaning_services_outlined, color: ArcadeTheme.primaryColor),
                 const SizedBox(width: 12),
-                Text(
-                  'MANUAL CLEANUP OPTIONS',
-                  style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
+                Expanded(
+                  child: Text(
+                    'MANUAL CLEANUP OPTIONS',
+                    style: GoogleFonts.blackOpsOne(fontSize: 16, letterSpacing: 1),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

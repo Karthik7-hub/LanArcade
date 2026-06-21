@@ -5,7 +5,37 @@ import { IdentityManager } from './shell/IdentityManager';
 import GameLoader from './plugin_runtime/GameLoader';
 import './plugin_runtime/ArcadeSDK'; // Initialize SDK
 import type { GameManifest } from './shared/types';
+import { 
+  User, 
+  Settings, 
+  Gamepad2, 
+  Maximize2, 
+  Minimize2, 
+  LogOut, 
+  X, 
+  Plus, 
+  Minus,
+  AlertCircle,
+  Trophy,
+  Eye,
+  Smartphone,
+  RotateCw,
+  Lock
+} from 'lucide-react';
 
+
+const resolveAvatarColor = (avatar: string) => {
+  switch (avatar) {
+    case 'indigo': return '#6366f1';
+    case 'pink': return '#ec4899';
+    case 'emerald': return '#10b981';
+    case 'amber': return '#f59e0b';
+    case 'cyan': return '#06b6d4';
+    case 'rose': return '#f43f5e';
+    case 'violet': return '#8b5cf6';
+    default: return '#6366f1';
+  }
+};
 
 const App: React.FC = () => {
   const isConnected = useStore((state) => state.isConnected);
@@ -19,7 +49,52 @@ const App: React.FC = () => {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [availableGames, setAvailableGames] = useState<GameManifest[]>([]);
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
-  const [lobbyTab, setLobbyTab] = useState<'players' | 'leaderboard'>('players');
+  const [lobbyTab, setLobbyTab] = useState<'players' | 'leaderboard' | 'rules' | 'profile'>('players');
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [editName, setEditName] = useState(player?.name || '');
+  const [editColor, setEditColor] = useState(player?.avatar || 'default');
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const [isViewingLobby, setIsViewingLobby] = useState(() => {
+    return localStorage.getItem('isViewingLobby') === 'true';
+  });
+
+  useEffect(() => {
+    if (player) {
+      setEditName(player.name);
+      setEditColor(player.avatar);
+    }
+  }, [player]);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (room && room.status === 'waiting') {
+      setIsViewingLobby(false);
+      localStorage.setItem('isViewingLobby', 'false');
+    }
+  }, [room?.status]);
+
+  const handleToggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   useEffect(() => {
     // Initial identity check
@@ -134,7 +209,16 @@ const App: React.FC = () => {
                 <h1 style={styles.lobbyTitle}>ARCADE LOBBY</h1>
                 <p style={styles.subtitle}>Hey {player.name}, what's the plan?</p>
               </div>
-              <div style={styles.avatar}>
+              <div 
+                onClick={() => { setIsProfileModalOpen(true); }}
+                style={{
+                  ...styles.avatar,
+                  background: resolveAvatarColor(player.avatar),
+                  cursor: 'pointer',
+                  border: '2px solid rgba(255, 255, 255, 0.4)',
+                  boxShadow: '0 0 10px rgba(255, 255, 255, 0.2)',
+                }}
+              >
                 {player.name[0].toUpperCase()}
               </div>
             </header>
@@ -153,7 +237,9 @@ const App: React.FC = () => {
                   onMouseEnter={() => setSelectedGame(game.id)}
                   onMouseLeave={() => setSelectedGame(null)}
                 >
-                  <div style={styles.gameCardIcon}>🎮</div>
+                  <div className="game-card-icon">
+                    <Gamepad2 size={32} />
+                  </div>
                   <div style={styles.gameCardName}>{game.name}</div>
                   <div style={styles.gameCardPlayers}>
                     {game.minPlayers}-{game.maxPlayers} players
@@ -189,8 +275,8 @@ const App: React.FC = () => {
       );
     }
 
-    if (room.status !== 'waiting') {
-      return <GameLoader />;
+    if (room.status !== 'waiting' && !isViewingLobby) {
+      return <GameLoader onOpenSettings={() => { setIsSettingsOpen(true); }} />;
     }
 
     return (
@@ -217,56 +303,69 @@ const App: React.FC = () => {
                 <h2 style={styles.gameName}>{room.game.name}</h2>
               )}
             </div>
-            <button
-              onClick={() => {
-                wsClient.send('room.leave', {});
-                window.history.replaceState({}, '', window.location.pathname);
-                window.location.reload();
-              }}
-              style={styles.leaveButton}
-            >
-              LEAVE ROOM
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={() => { setIsSettingsOpen(true); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.textMuted,
+                  cursor: 'pointer',
+                  padding: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Settings size={20} />
+              </button>
+              <button
+                onClick={() => {
+                  wsClient.send('room.leave', {});
+                  window.history.replaceState({}, '', window.location.pathname);
+                  window.location.reload();
+                }}
+                style={styles.leaveButton}
+              >
+                LEAVE ROOM
+              </button>
+            </div>
           </header>
 
           <div style={styles.card}>
             {/* Tab Toggle */}
-            <div style={{ display: 'flex', gap: 16, borderBottom: `1px solid ${colors.border}`, paddingBottom: 12, marginBottom: 12 }}>
+            <div className="lobby-tabs-header">
               <button
                 onClick={() => setLobbyTab('players')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: lobbyTab === 'players' ? colors.primary : colors.textMuted,
-                  fontWeight: 800,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  borderBottom: lobbyTab === 'players' ? `2px solid ${colors.primary}` : 'none',
-                  paddingBottom: 4,
-                  outline: 'none',
-                }}
+                className={`lobby-tab-btn ${lobbyTab === 'players' ? 'active' : ''}`}
               >
-                PLAYERS ({room.players.length})
+                <User size={14} />
+                <span>PLAYERS ({room.players.length})</span>
               </button>
               <button
                 onClick={() => setLobbyTab('leaderboard')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: lobbyTab === 'leaderboard' ? colors.secondary : colors.textMuted,
-                  fontWeight: 800,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  borderBottom: lobbyTab === 'leaderboard' ? `2px solid ${colors.secondary}` : 'none',
-                  paddingBottom: 4,
-                  outline: 'none',
-                }}
+                className={`lobby-tab-btn ${lobbyTab === 'leaderboard' ? 'active shadow-pink' : ''}`}
               >
-                🏆 ROOM LEADERBOARD
+                <Trophy size={14} />
+                <span>LEADERBOARD</span>
+              </button>
+              <button
+                onClick={() => setLobbyTab('rules')}
+                className={`lobby-tab-btn ${lobbyTab === 'rules' ? 'active shadow-green' : ''}`}
+              >
+                <Gamepad2 size={14} />
+                <span>GAME RULES</span>
+              </button>
+              <button
+                onClick={() => setLobbyTab('profile')}
+                className={`lobby-tab-btn ${lobbyTab === 'profile' ? 'active shadow-indigo' : ''}`}
+              >
+                <User size={14} />
+                <span>PROFILE</span>
               </button>
             </div>
 
-            {lobbyTab === 'players' ? (
+            {lobbyTab === 'players' && (
               <>
                 <div style={styles.playerListHeader}>
                   <h3 style={styles.cardTitle}>PLAYERS IN LOBBY</h3>
@@ -277,7 +376,11 @@ const App: React.FC = () => {
                 <ul style={styles.playerList}>
                   {room.players.map(p => (
                     <li key={p.id} style={styles.playerItem}>
-                      <div style={styles.playerAvatar}>
+                      <div style={{
+                        ...styles.playerAvatar,
+                        background: resolveAvatarColor(p.avatar),
+                        border: '2px solid rgba(255, 255, 255, 0.2)'
+                      }}>
                         {p.name[0].toUpperCase()}
                       </div>
                       <span style={styles.playerName}>{p.name}</span>
@@ -287,8 +390,34 @@ const App: React.FC = () => {
                     </li>
                   ))}
                 </ul>
+                {room.spectators && room.spectators.length > 0 && (
+                  <>
+                    <div style={{ ...styles.playerListHeader, marginTop: 24 }}>
+                      <h3 style={styles.cardTitle}>SPECTATORS ({room.spectators.length})</h3>
+                    </div>
+                    <ul style={styles.playerList}>
+                      {room.spectators.map(p => (
+                        <li key={p.id} style={{ ...styles.playerItem, opacity: 0.8, borderStyle: 'dashed' }}>
+                          <div style={{
+                            ...styles.playerAvatar,
+                            background: resolveAvatarColor(p.avatar),
+                            border: '1px dashed rgba(255, 255, 255, 0.4)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Eye size={14} />
+                          </div>
+                          <span style={styles.playerName}>{p.name} (Spectating)</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </>
-            ) : (
+            )}
+
+            {lobbyTab === 'leaderboard' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(() => {
                   const leaderboardData = room.settings?._leaderboard || {};
@@ -309,10 +438,11 @@ const App: React.FC = () => {
                   }
 
                   return sortedEntries.map((entry, idx) => {
-                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
+                    const suffix = idx === 0 ? "st" : idx === 1 ? "nd" : idx === 2 ? "rd" : "th";
+                    const badgeClass = idx < 3 ? `rank-${idx + 1}` : 'rank-other';
                     return (
                       <div key={entry.id} style={styles.playerItem}>
-                        <div style={styles.playerAvatar}>{medal}</div>
+                        <div className={`rank-badge ${badgeClass}`}>{idx + 1}{suffix}</div>
                         <span style={styles.playerName}>{entry.name}</span>
                         <span style={styles.hostBadge}>{entry.wins} WINS</span>
                       </div>
@@ -321,91 +451,204 @@ const App: React.FC = () => {
                 })()}
               </div>
             )}
-          </div>
 
-          {/* Room Settings Panel */}
-          <div style={{ ...styles.card, marginTop: 12 }}>
-            <h3 style={styles.cardTitle}><span style={{ marginRight: 6 }}>⚙️</span>ROOM GAME SETTINGS</h3>
-            <p style={styles.cardSubtitle}>
-              {player.id === room.hostId ? 'Configure game presets and house rules below.' : 'View current rules configured by the host.'}
-            </p>
-            
-            <div style={styles.settingsContainer}>
-              {room.game.settingsSchema ? (
-                Object.entries(room.game.settingsSchema).map(([key, def]: [string, any]) => {
-                  // Special check: hide isDailyChallenge if levelType is not 'procedural'
-                  if (key === 'isDailyChallenge' && room.settings?.levelType !== 'procedural') {
-                    return null;
-                  }
+            {lobbyTab === 'rules' && (
+              <div className="lobby-rules-tab">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: `1px solid ${colors.border}`, paddingBottom: 10 }}>
+                  <div style={styles.settingsLabel}>
+                    {player?.id === room.hostId ? (
+                      <span style={{ color: colors.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Settings size={14} /> HOST PRIVILEGES ACTIVE
+                      </span>
+                    ) : (
+                      <span style={{ color: colors.textMuted, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Lock size={14} /> READ-ONLY LOBBY RULES
+                      </span>
+                    )}
+                  </div>
+                  {player?.id === room.hostId && (
+                    <span style={{ fontSize: 11, color: colors.textMuted, fontStyle: 'italic' }}>
+                      Changes apply instantly
+                    </span>
+                  )}
+                </div>
+                
+                <div className="settings-rules-grid">
+                  {room.game.settingsSchema ? (
+                    Object.entries(room.game.settingsSchema).map(([key, def]: [string, any]) => {
+                      if (key === 'isDailyChallenge' && room.settings?.levelType !== 'procedural') {
+                        return null;
+                      }
 
-                  const value = room.settings?.[key] !== undefined ? room.settings[key] : def.default;
+                      const value = room.settings?.[key] !== undefined ? room.settings[key] : def.default;
 
-                  return (
-                    <div key={key} style={styles.settingsRow}>
-                      <div>
-                        <div style={styles.settingsLabel}>{def.label || key}</div>
-                        {def.description && (
-                          <div style={styles.settingsDescription}>{def.description}</div>
-                        )}
-                      </div>
-                      {def.type === 'select' && (
-                        <select
-                          value={value}
-                          onChange={e => {
-                            let val: any = e.target.value;
-                            if (def.options && def.options.length > 0 && typeof def.options[0].value === 'number') {
-                              val = Number(val);
-                            }
-                            if (key === 'preset') {
-                              handlePresetChange(val);
-                            } else {
-                              handleUpdateSetting(key, val);
-                            }
-                          }}
-                          disabled={player.id !== room.hostId}
-                          style={styles.selectInput}
-                        >
-                          {def.options?.map((opt: any) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label || opt.value}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      {def.type === 'number' && (
-                        <input
-                          type="number"
-                          min={def.min}
-                          max={def.max}
-                          value={value}
-                          onChange={e => {
-                            const val = parseInt(e.target.value);
-                            handleUpdateSetting(key, isNaN(val) ? def.default : val);
-                          }}
-                          disabled={player.id !== room.hostId}
-                          style={styles.numberInput}
-                        />
-                      )}
-                      {def.type === 'boolean' && (
-                        <input
-                          type="checkbox"
-                          checked={!!value}
-                          onChange={e => handleUpdateSetting(key, e.target.checked)}
-                          disabled={player.id !== room.hostId}
-                          style={styles.checkboxInput}
-                        />
-                      )}
+                      if (def.type === 'boolean') {
+                        const handleToggle = () => {
+                          if (player?.id !== room.hostId) return;
+                          handleUpdateSetting(key, !value);
+                        };
+                        return (
+                          <div 
+                            key={key} 
+                            onClick={handleToggle}
+                            className={`rule-card ${value ? 'active' : ''}`}
+                            style={{ cursor: player?.id === room.hostId ? 'pointer' : 'default' }}
+                          >
+                            <div className="rule-card-title">{def.label || key}</div>
+                            <div className="rule-card-control">
+                              <span className="rule-card-value" style={{ color: value ? '#34d399' : '#94a3b8' }}>
+                                {value ? 'ACTIVE' : 'INACTIVE'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (def.type === 'number') {
+                        const handleDec = (e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          if (player?.id !== room.hostId) return;
+                          const val = value - 1;
+                          handleUpdateSetting(key, val >= (def.min ?? 0) ? val : value);
+                        };
+                        const handleInc = (e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          if (player?.id !== room.hostId) return;
+                          const val = value + 1;
+                          handleUpdateSetting(key, val <= (def.max ?? 1000) ? val : value);
+                        };
+                        return (
+                          <div key={key} className="rule-card">
+                            <div className="rule-card-title">{def.label || key}</div>
+                            <div className="rule-card-control">
+                              <span className="rule-card-value">{value}</span>
+                              <div className="rule-number-adjuster">
+                                <button 
+                                  onClick={handleDec}
+                                  disabled={player?.id !== room.hostId || value <= (def.min ?? 0)}
+                                  className="rule-adjust-btn"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <button 
+                                  onClick={handleInc}
+                                  disabled={player?.id !== room.hostId || value >= (def.max ?? 1000)}
+                                  className="rule-adjust-btn"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // select
+                      return (
+                        <div key={key} className="rule-card">
+                          <div className="rule-card-title">{def.label || key}</div>
+                          <div className="rule-card-control" style={{ width: '100%' }}>
+                            <select
+                              value={value}
+                              onChange={e => {
+                                let val: any = e.target.value;
+                                if (def.options && def.options.length > 0 && typeof def.options[0].value === 'number') {
+                                  val = Number(val);
+                                }
+                                if (key === 'preset') {
+                                  handlePresetChange(val);
+                                } else {
+                                  handleUpdateSetting(key, val);
+                                }
+                              }}
+                              disabled={player?.id !== room.hostId}
+                              className="rule-card-select-overlay"
+                            >
+                              {def.options?.map((opt: any) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label || opt.value}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="settings-rules-empty">
+                      No Customizable Rules.
                     </div>
-                  );
-                })
-              ) : (
-                <p style={styles.cardSubtitle}>No customizable settings available for this game.</p>
-              )}
-            </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {lobbyTab === 'profile' && (
+              <div className="lobby-profile-tab">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="settings-modal-row">
+                    <label>Username</label>
+                    <input 
+                      type="text" 
+                      value={editName} 
+                      onChange={e => setEditName(e.target.value)} 
+                      className="settings-modal-input"
+                      placeholder="Username"
+                    />
+                  </div>
+                  <div className="settings-modal-row">
+                    <label>Avatar Color</label>
+                    <div className="avatar-color-picker">
+                      {['indigo', 'pink', 'emerald', 'amber', 'cyan', 'rose', 'violet'].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => setEditColor(c)}
+                          className={`avatar-color-circle ${editColor === c ? 'active' : ''}`}
+                          style={{
+                            backgroundColor: resolveAvatarColor(c),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (editName.trim()) {
+                        const updatedPlayer = { ...player!, name: editName, avatar: editColor };
+                        setPlayer(updatedPlayer);
+                        IdentityManager.savePlayer(updatedPlayer);
+                        wsClient.send('player.identify', updatedPlayer);
+                      }
+                    }} 
+                    className="settings-modal-save-btn"
+                  >
+                    SAVE CHANGES
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={styles.startSection}>
-            {room.status === 'waiting' && player.id === room.hostId ? (
+            {room.status !== 'waiting' ? (
+              <button
+                onClick={() => {
+                  setIsViewingLobby(false);
+                  localStorage.setItem('isViewingLobby', 'false');
+                }}
+                style={{
+                  ...styles.startButton,
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <Gamepad2 size={24} /> REJOIN ACTIVE MATCH
+              </button>
+            ) : player.id === room.hostId ? (
               <>
                 <button
                   onClick={() => wsClient.send('game.action', { type: 'START', data: {} })}
@@ -437,13 +680,171 @@ const App: React.FC = () => {
     );
   };
 
+  const renderSettingsModal = () => {
+    if (!isSettingsOpen) return null;
+
+    const handleLeaveMatch = () => {
+      if (window.confirm("Are you sure you want to leave the active match? You can rejoin later.")) {
+        setIsViewingLobby(true);
+        localStorage.setItem('isViewingLobby', 'true');
+        setIsSettingsOpen(false);
+      }
+    };
+
+    const handleLeaveRoomReal = () => {
+      if (window.confirm("Are you sure you want to leave the room?")) {
+        wsClient.send('room.leave', {});
+        window.history.replaceState({}, '', window.location.pathname);
+        window.location.reload();
+      }
+    };
+
+    return (
+      <div className="settings-modal-overlay">
+        <div className="settings-modal-card system-modal-card">
+          <div className="settings-tab-header" style={{ justifyContent: 'space-between', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Settings size={20} className="tab-header-icon" />
+              <h3>SYSTEM SETTINGS</h3>
+            </span>
+            <button onClick={() => setIsSettingsOpen(false)} className="settings-floating-close-btn" style={{ display: 'block', position: 'static' }}>
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="settings-modal-body" style={{ marginTop: 20 }}>
+            <div className="settings-grid">
+              {/* Fullscreen Toggle Card */}
+              <div 
+                onClick={handleToggleFullscreen}
+                className={`settings-card-item ${isFullscreen ? 'active' : ''}`}
+              >
+                <div className="settings-card-icon-wrap">
+                  {isFullscreen ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
+                </div>
+                <div className="settings-card-title">Fullscreen Mode</div>
+                <span className="settings-card-status">
+                  {isFullscreen ? 'ON' : 'OFF'}
+                </span>
+              </div>
+
+              {/* Return to Lobby Card */}
+              {room && room.status === 'active' && !isViewingLobby && (
+                <div 
+                  onClick={handleLeaveMatch}
+                  className="settings-card-item accent-green"
+                >
+                  <div className="settings-card-icon-wrap">
+                    <Gamepad2 size={24} />
+                  </div>
+                  <div className="settings-card-title">Return to Lobby</div>
+                  <span className="settings-card-status">
+                    GO TO LOBBY
+                  </span>
+                </div>
+              )}
+
+              {/* Quit/Abandon Lobby Card */}
+              {room && (
+                <div 
+                  onClick={handleLeaveRoomReal}
+                  className="settings-card-item accent-red"
+                  style={{ gridColumn: (room.status === 'active' && !isViewingLobby) ? 'auto' : 'span 2' }}
+                >
+                  <div className="settings-card-icon-wrap">
+                    <LogOut size={24} />
+                  </div>
+                  <div className="settings-card-title">Abandon Match</div>
+                  <span className="settings-card-status">
+                    QUIT ROOM
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderProfileModal = () => {
+    if (!isProfileModalOpen) return null;
+
+    const saveProfile = () => {
+      if (editName.trim()) {
+        const updatedPlayer = { ...player!, name: editName, avatar: editColor };
+        setPlayer(updatedPlayer);
+        IdentityManager.savePlayer(updatedPlayer);
+        wsClient.send('player.identify', updatedPlayer);
+        setIsProfileModalOpen(false);
+      }
+    };
+
+    return (
+      <div className="settings-modal-overlay">
+        <div className="settings-modal-card profile-modal-card">
+          <div className="settings-tab-header" style={{ justifyContent: 'space-between', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <User size={20} className="tab-header-icon" />
+              <h3>EDIT PROFILE</h3>
+            </span>
+            <button onClick={() => setIsProfileModalOpen(false)} className="settings-floating-close-btn" style={{ display: 'block', position: 'static' }}>
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="settings-modal-body" style={{ marginTop: 16 }}>
+            <div className="settings-modal-row">
+              <label>Username</label>
+              <input 
+                type="text" 
+                value={editName} 
+                onChange={e => setEditName(e.target.value)} 
+                className="settings-modal-input"
+                placeholder="Username"
+              />
+            </div>
+            <div className="settings-modal-row" style={{ marginTop: 16 }}>
+              <label>Avatar Color</label>
+              <div className="avatar-color-picker">
+                {['indigo', 'pink', 'emerald', 'amber', 'cyan', 'rose', 'violet'].map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setEditColor(c)}
+                    className={`avatar-color-circle ${editColor === c ? 'active' : ''}`}
+                    style={{
+                      backgroundColor: resolveAvatarColor(c),
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <button onClick={saveProfile} className="settings-modal-save-btn" style={{ marginTop: 24, width: '100%' }}>
+              SAVE CHANGES
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
+      <div className="portrait-overlay">
+        <div className="portrait-overlay-icon-wrap">
+          <Smartphone className="phone-icon" />
+          <RotateCw className="rotate-icon" />
+        </div>
+        <div className="portrait-overlay-title">Landscape Mode Required</div>
+        <div className="portrait-overlay-text">
+          Please rotate your device to landscape for the best gaming interface.
+        </div>
+      </div>
       {errorAlert && (
         <div style={styles.errorAlertOverlay}>
           <div style={styles.errorAlertCard}>
             <div style={styles.errorAlertHeader}>
-              <span style={{ fontSize: 24 }}>⚠️</span>
+              <AlertCircle size={24} className="text-danger" style={{ color: colors.danger }} />
               <h4 style={styles.errorAlertTitle}>SYSTEM ALERT</h4>
             </div>
             <p style={styles.errorAlertText}>{errorAlert}</p>
@@ -454,7 +855,8 @@ const App: React.FC = () => {
         </div>
       )}
       {renderView()}
-
+      {renderSettingsModal()}
+      {renderProfileModal()}
     </>
   );
 };
@@ -942,6 +1344,157 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: 'none',
     opacity: 0.6,
   },
+};
+
+const modalStyles: Record<string, React.CSSProperties> = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    backdropFilter: 'blur(10px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  modal: {
+    backgroundColor: '#0f172a',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 480,
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(99, 102, 241, 0.1)',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: "'Inter', 'system-ui', sans-serif",
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    paddingBottom: 12,
+  },
+  title: {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 900,
+    letterSpacing: '0.5px',
+    color: '#fff',
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#94a3b8',
+    fontSize: '24px',
+    cursor: 'pointer',
+    outline: 'none',
+  },
+  tabContainer: {
+    display: 'flex',
+    gap: 16,
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    marginBottom: 20,
+  },
+  tabBtn: {
+    background: 'none',
+    border: 'none',
+    borderBottom: '2px solid transparent',
+    padding: '8px 4px',
+    fontSize: 13,
+    fontWeight: 800,
+    cursor: 'pointer',
+    outline: 'none',
+    transition: 'all 0.2s',
+  },
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  tabContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: 800,
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+  },
+  input: {
+    background: '#020617',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    color: '#fff',
+    padding: '12px 16px',
+    fontSize: 15,
+    fontWeight: 700,
+    outline: 'none',
+  },
+  colorGrid: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  saveBtn: {
+    background: 'linear-gradient(135deg, #6366f1, #ec4899)',
+    border: 'none',
+    borderRadius: 12,
+    color: '#fff',
+    padding: '14px 20px',
+    fontWeight: 900,
+    fontSize: 14,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+    marginTop: 8,
+  },
+  sysRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 0',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+  },
+  sysTitle: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#fff',
+  },
+  sysDesc: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  leaveMatchBtn: {
+    background: 'linear-gradient(135deg, #10b981, #059669)',
+    border: 'none',
+    borderRadius: 12,
+    color: '#fff',
+    padding: '14px 20px',
+    fontWeight: 800,
+    fontSize: 13,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+  },
+  leaveRoomBtn: {
+    background: '#ef4444',
+    border: 'none',
+    borderRadius: 12,
+    color: '#fff',
+    padding: '14px 20px',
+    fontWeight: 800,
+    fontSize: 13,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+  }
 };
 
 export default App;

@@ -1592,7 +1592,21 @@
             const hand = privateState?.hand || [];
             const isLocalFinished = finishedPlayers.includes(player.id);
 
-            if (isLocalFinished) {
+            const isSpectator = !room.players.some(p => p.id === player.id);
+
+            if (isSpectator) {
+                DOM.handContainer.style.overflowX = 'visible';
+                DOM.handContainer.style.justifyContent = 'center';
+                DOM.handContainer.style.paddingLeft = '0';
+                DOM.handContainer.style.paddingRight = '0';
+                DOM.handContainer.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; height:120px; width:100%; color:#94a3b8; background:rgba(15,23,42,0.6); border-radius:16px; border:2px dashed rgba(255,255,255,0.1); margin: 0 20px;">
+                        <span style="font-size: 28px;">👁️</span>
+                        <span style="font-weight:900; font-size:16px; text-transform:uppercase; letter-spacing:1px;">👁️ SPECTATING MATCH</span>
+                        <span style="color:#64748b; font-size:12px;">You joined mid-game and are watching.</span>
+                    </div>
+                `;
+            } else if (isLocalFinished) {
                 const placementIdx = finishedPlayers.indexOf(player.id);
                 const placementText = placementIdx !== -1 ? `${placementIdx + 1}${getOrdinal(placementIdx + 1)}` : '';
                 DOM.handContainer.style.overflowX = 'visible';

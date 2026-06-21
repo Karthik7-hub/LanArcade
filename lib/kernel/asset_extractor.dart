@@ -6,7 +6,7 @@ import 'package:logging/logging.dart';
 
 class AssetExtractor {
   static final _log = Logger('AssetExtractor');
-  static const String _version = '1.0.0+1';
+  static const String _version = '1.0.0+5';
 
   static Future<String> getExtractedRoot() async {
     final docsDir = await getApplicationDocumentsDirectory();

@@ -31,6 +31,10 @@ class ConnectionManager {
     return _connections.values.where((conn) => conn.roomId == roomId).length;
   }
 
+  bool isPlayerOnline(String playerId, String roomId) {
+    return _connections.values.any((conn) => conn.player?.id == playerId && conn.roomId == roomId);
+  }
+
 
   void addConnection(String id, WebSocketChannel socket) {
     _connections[id] = Connection(id, socket);

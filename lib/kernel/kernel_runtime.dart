@@ -255,6 +255,32 @@ class KernelRuntime {
         connectionManager.removeStaleConnections(player.id, connectionId);
         connection.send('player.identified', player.toJson());
         logSystemEvent('PLAYER_IDENTIFIED: connectionId=$connectionId, player=${player.name} (${player.id})');
+
+        if (connection.roomId != null) {
+          final roomId = connection.roomId!;
+          final room = roomData[roomId];
+          if (room != null) {
+            bool changed = false;
+            for (int i = 0; i < room.players.length; i++) {
+              if (room.players[i].id == player.id) {
+                room.players[i] = player;
+                changed = true;
+              }
+            }
+            for (int i = 0; i < room.spectators.length; i++) {
+              if (room.spectators[i].id == player.id) {
+                room.spectators[i] = player;
+                changed = true;
+              }
+            }
+            if (changed) {
+              await roomService.updatePlayers(roomId, room.players);
+              connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
+              final engine = activeEngines[roomId];
+              engine?.playerJoined(player);
+            }
+          }
+        }
         break;
 
       case 'room.create':
@@ -373,36 +399,63 @@ class KernelRuntime {
         );
 
         if (roomId.isNotEmpty) {
-          final room = roomData[roomId]!;
+          var room = roomData[roomId]!;
 
-          // Enforce maxPlayers only for new players (bypass if reconnecting)
-          final isAlreadyInRoom = room.players.any((p) => p.id == connection.player!.id);
-          if (!isAlreadyInRoom && room.players.length >= room.game.maxPlayers) {
-            connection.send('system.error', 'Room is full');
-            return;
+          // If current host is offline, transfer host privileges to the joining/reconnecting player
+          final isHostOnline = connectionManager.isPlayerOnline(room.hostId, roomId);
+          if (!isHostOnline) {
+            room = room.copyWith(hostId: connection.player!.id);
+            roomData[roomId] = room;
+            await roomService.updateHost(roomId, connection.player!.id);
+            logSystemEvent('HOST_TRANSFERRED: host of roomCode=$code transferred to ${connection.player!.name} because previous host was offline.');
           }
 
-          // Cancel any pending cleanup timers for this room since a player has rejoined
+          final isAlreadyInRoom = room.players.any((p) => p.id == connection.player!.id);
+          final isAlreadySpectating = room.spectators.any((p) => p.id == connection.player!.id);
+
+          // Cancel any pending cleanup timers for this room since a player has joined or rejoined
           if (_cleanupTimers.containsKey(roomId)) {
             _cleanupTimers[roomId]?.cancel();
             _cleanupTimers.remove(roomId);
-            logSystemEvent('CLEANUP_TIMER_CANCELLED: Player rejoined roomCode=$code.');
+            logSystemEvent('CLEANUP_TIMER_CANCELLED: Player joined/rejoined roomCode=$code.');
           }
 
-          if (!isAlreadyInRoom) {
+          if (isAlreadyInRoom) {
+            logSystemEvent('PLAYER_RECONNECTED: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
+            connection.roomId = roomId;
+            connection.send('room.update', room.toJson());
+            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
+
+            final engine = activeEngines[roomId];
+            engine?.playerJoined(connection.player!);
+          } else if (isAlreadySpectating) {
+            logSystemEvent('SPECTATOR_RECONNECTED: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
+            connection.roomId = roomId;
+            connection.send('room.update', room.toJson());
+            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
+          } else if (room.status == models.RoomStatus.active) {
+            // Join as spectator mid-game
+            room.spectators.add(connection.player!);
+            logSystemEvent('PLAYER_JOINED_AS_SPECTATOR: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
+            connection.roomId = roomId;
+            connection.send('room.update', room.toJson());
+            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
+          } else {
+            // Join as normal player
+            if (room.players.length >= room.game.maxPlayers) {
+              connection.send('system.error', 'Room is full');
+              return;
+            }
             room.players.add(connection.player!);
             await roomService.updatePlayers(roomId, room.players);
             logSystemEvent('PLAYER_JOINED_ROOM: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
-          } else {
-            logSystemEvent('PLAYER_RECONNECTED: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
-          }
-          connection.roomId = roomId;
-          connection.send('room.update', room.toJson());
-          connectionManager.broadcastToRoom(
-              roomId, 'room.update', room.toJson());
+            connection.roomId = roomId;
+            connection.send('room.update', room.toJson());
+            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
 
-          final engine = activeEngines[roomId];
-          engine?.playerJoined(connection.player!);
+            final engine = activeEngines[roomId];
+            engine?.playerJoined(connection.player!);
+          }
         } else {
           connection.send('system.error', 'Room not found');
         }
@@ -452,17 +505,23 @@ class KernelRuntime {
             newSettings['_leaderboard'] = room.settings['_leaderboard'];
           }
 
+          // Concatenate spectators back into room.players
+          final allPlayers = [...room.players, ...room.spectators];
+
           // Dispose old engine
           final oldEngine = activeEngines.remove(roomId);
           oldEngine?.dispose();
 
           final updatedRoom = room.copyWith(
+            players: allPlayers,
+            spectators: [],
             game: manifest,
             settings: newSettings,
             publicGameState: null,
           );
           roomData[roomId] = updatedRoom;
 
+          await roomService.updatePlayers(roomId, allPlayers);
           await roomService.updateGame(roomId, manifest, newSettings);
           await roomService.updatePublicState(roomId, {});
 
@@ -552,16 +611,22 @@ class KernelRuntime {
         final roomId = connection.roomId!;
         final room = roomData[roomId];
         if (room != null && connection.player!.id == room.hostId) {
+          // Concatenate spectators back into room.players
+          final allPlayers = [...room.players, ...room.spectators];
+
           // Dispose old engine
           final oldEngine = activeEngines.remove(roomId);
           oldEngine?.dispose();
 
           final updatedRoom = room.copyWith(
+            players: allPlayers,
+            spectators: [],
             status: models.RoomStatus.waiting,
             publicGameState: null,
           );
           roomData[roomId] = updatedRoom;
 
+          await roomService.updatePlayers(roomId, allPlayers);
           await roomService.updateStatus(roomId, models.RoomStatus.waiting);
           await roomService.updatePublicState(roomId, {});
 
@@ -716,6 +781,21 @@ class KernelRuntime {
       engine?.playerLeft(connection.player!);
 
       connectionManager.removeConnection(connectionId);
+
+      if (room != null && room.hostId == connection.player!.id) {
+        final nextOnlinePlayer = room.players.firstWhere(
+          (p) => p.id != connection.player!.id && connectionManager.isPlayerOnline(p.id, roomId),
+          orElse: () => models.Player(id: '', name: '', avatar: ''),
+        );
+        if (nextOnlinePlayer.id.isNotEmpty) {
+          final updatedRoom = room.copyWith(hostId: nextOnlinePlayer.id);
+          roomData[roomId] = updatedRoom;
+          roomService.updateHost(roomId, nextOnlinePlayer.id);
+          connectionManager.broadcastToRoom(roomId, 'room.update', updatedRoom.toJson());
+          logSystemEvent('HOST_TRANSFERRED: host of roomCode=$roomCode transferred to ${nextOnlinePlayer.name} because previous host disconnected.');
+        }
+      }
+
       final remaining = connectionManager.getActiveConnectionsCount(roomId);
       if (remaining == 0) {
         logSystemEvent('LAST_PLAYER_DISCONNECTED: roomCode=$roomCode has 0 active players. Starting 60s cleanup timer.');
@@ -837,9 +917,12 @@ class KernelRuntime {
     final room = roomData[roomId];
     if (room == null) return;
 
+    final wasPlayer = room.players.any((p) => p.id == player.id);
     room.players.removeWhere((p) => p.id == player.id);
+    room.spectators.removeWhere((p) => p.id == player.id);
+
     final engine = activeEngines[roomId];
-    if (engine != null) {
+    if (engine != null && wasPlayer) {
       engine.playerLeft(player);
     }
 
@@ -848,7 +931,10 @@ class KernelRuntime {
       _cleanupTimers.remove(roomId);
       await _destroyRoom(roomId);
     } else {
-      var updatedRoom = room.copyWith(players: room.players);
+      var updatedRoom = room.copyWith(
+        players: room.players,
+        spectators: room.spectators,
+      );
       if (room.hostId == player.id) {
         final newHost = room.players.first;
         updatedRoom = updatedRoom.copyWith(hostId: newHost.id);
