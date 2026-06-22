@@ -95,9 +95,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('SHUTDOWN ARCADE?'),
+          title: const Text('STOP SERVER?'),
           content: const Text(
-            'Are you sure you want to shut down the server? Active rooms and connections will be lost.',
+            'Are you sure you want to stop the server? Active games and players will disconnect.',
           ),
           actions: [
             TextButton(
@@ -107,10 +107,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
+                backgroundColor: ArcadeTheme.errorColor,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('SHUTDOWN'),
+              child: const Text('STOP'),
             ),
           ],
         ),
@@ -176,9 +176,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           final confirmExit = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('SHUTDOWN SERVER & EXIT?'),
+              title: const Text('STOP SERVER & EXIT?'),
               content: const Text(
-                'The arcade server is currently running. Exiting the app will stop the server and disconnect all players.',
+                'The server is running. Exiting will stop the server and disconnect all players.',
               ),
               actions: [
                 TextButton(
@@ -188,10 +188,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
+                    backgroundColor: ArcadeTheme.errorColor,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('SHUTDOWN & EXIT'),
+                  child: const Text('STOP & EXIT'),
                 ),
               ],
             ),
@@ -208,37 +208,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
         }
       },
       child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [ArcadeTheme.backgroundColor, Color(0xFF020617)],
-            ),
-          ),
-          child: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                _buildAppBar(),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildStatsRow(),
+        backgroundColor: ArcadeTheme.backgroundColor,
+        body: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              _buildAppBar(),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildStatsRow(),
+                    const SizedBox(height: 20),
+                    if (_isRunning) ...[
+                      _buildNetworkCard(),
                       const SizedBox(height: 20),
-                      if (_isRunning) _buildNetworkCard(),
-                      if (_isRunning) ...[
-                        const SizedBox(height: 20),
-                        _buildGamesSection(),
-                      ],
+                      _buildGamesSection(),
                       const SizedBox(height: 20),
                       _buildActivityChart(),
-                      const SizedBox(height: 100),
-                    ]),
-                  ),
+                    ],
+                    const SizedBox(height: 100),
+                  ]),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -251,10 +243,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _isRunning ? Colors.green.withValues(alpha: 0.12) : Colors.red.withValues(alpha: 0.12),
+        color: _isRunning ? ArcadeTheme.successColor.withValues(alpha: 0.12) : ArcadeTheme.errorColor.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: _isRunning ? Colors.greenAccent.withValues(alpha: 0.5) : Colors.redAccent.withValues(alpha: 0.5),
+          color: _isRunning ? ArcadeTheme.successColor.withValues(alpha: 0.3) : ArcadeTheme.errorColor.withValues(alpha: 0.3),
           width: 1.0,
         ),
       ),
@@ -266,13 +258,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _isRunning ? Colors.greenAccent : Colors.redAccent,
-              boxShadow: [
-                BoxShadow(
-                  color: _isRunning ? Colors.greenAccent : Colors.redAccent,
-                  blurRadius: 4,
-                ),
-              ],
+              color: _isRunning ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
             ),
           ).animate(
             onPlay: (controller) {
@@ -285,7 +271,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Text(
             _isRunning ? 'LIVE' : 'OFFLINE',
             style: GoogleFonts.plusJakartaSans(
-              color: _isRunning ? Colors.greenAccent : Colors.redAccent,
+              color: _isRunning ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
               fontSize: 10,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.5,
@@ -319,12 +305,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 fontSize: 18,
                 letterSpacing: 1.2,
                 color: ArcadeTheme.primaryColor,
-                shadows: [
-                  Shadow(
-                    color: ArcadeTheme.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                  )
-                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -401,7 +381,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
             ),
-            child: _buildStatCardContent('PLAYERS', _activePlayersCount.toString(), Icons.people_rounded, ArcadeTheme.primaryColor),
+            child: _buildStatCardContent('PLAYERS', _activePlayersCount.toString(), Icons.people_rounded),
           ),
         ),
         const SizedBox(width: 16),
@@ -416,28 +396,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
             ),
-            child: _buildStatCardContent('ROOMS', _activeRoomsCount.toString(), Icons.grid_view_rounded, ArcadeTheme.secondaryColor),
+            child: _buildStatCardContent('ROOMS', _activeRoomsCount.toString(), Icons.grid_view_rounded),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStatCardContent(String label, String value, IconData icon, Color color) {
-    return Container(
+  Widget _buildStatCardContent(String label, String value, IconData icon) {
+    return ArcadeCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: ArcadeTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.15), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -447,20 +415,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Text(
                 label,
                 style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white30,
+                  color: ArcadeTheme.textSecondary,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 18),
-              ),
+              Icon(icon, color: ArcadeTheme.primaryColor, size: 18),
             ],
           ),
           const SizedBox(height: 12),
@@ -470,7 +431,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               fontSize: 36,
               fontWeight: FontWeight.w800,
               letterSpacing: -1,
-              color: Colors.white,
+              color: ArcadeTheme.textPrimary,
             ),
           ),
         ],
@@ -480,28 +441,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildNetworkCard() {
     final String serverUrl = "http://${_ipAddress ?? '0.0.0.0'}:8080";
-    return Container(
+    return ArcadeCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: ArcadeTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           Text(
-            'JOIN WITH CODE OR SCAN',
+            'SCAN QR OR COPY LINK',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.white54,
+              color: ArcadeTheme.textSecondary,
               letterSpacing: 1.5,
             ),
           ),
@@ -511,13 +460,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ],
             ),
             child: QrImageView(
               data: serverUrl,
@@ -541,13 +483,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 SnackBar(
                   content: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 18),
+                      const Icon(Icons.check_circle_rounded, color: ArcadeTheme.successColor, size: 18),
                       const SizedBox(width: 8),
-                      const Text('Server URL copied to clipboard!'),
+                      const Text('Link copied!'),
                     ],
                   ),
                   behavior: SnackBarBehavior.floating,
-                  backgroundColor: ArcadeTheme.surfaceColor,
+                  backgroundColor: ArcadeTheme.cardColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               );
@@ -570,7 +512,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     style: GoogleFonts.firaCode(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Colors.white,
+                      color: ArcadeTheme.textPrimary,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -585,21 +527,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildActivityChart() {
-    return Container(
-      height: 220,
+    return ArcadeCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: ArcadeTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -607,11 +536,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'LIVE TRAFFIC ACTIVITY',
+                'SERVER ACTIVITY',
                 style: GoogleFonts.plusJakartaSans(
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
-                  color: Colors.white38,
+                  color: ArcadeTheme.textSecondary,
                   letterSpacing: 1.2,
                 ),
               ),
@@ -622,17 +551,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   shape: BoxShape.circle,
                   color: ArcadeTheme.primaryColor,
                 ),
-              ).animate(
-                onPlay: (controller) {
-                  if (!Platform.environment.containsKey('FLUTTER_TEST')) {
-                    controller.repeat(reverse: true);
-                  }
-                },
-              ).scale(begin: const Offset(0.7, 0.7), end: const Offset(1.3, 1.3), duration: 800.ms),
+              ),
             ],
           ),
           const SizedBox(height: 24),
-          Expanded(
+          SizedBox(
+            height: 140,
             child: LineChart(
               LineChartData(
                 gridData: FlGridData(
@@ -677,44 +601,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildMainActionButton() {
+    Color bg = _isRunning ? ArcadeTheme.errorColor : ArcadeTheme.primaryColor;
+    Color fg = _isRunning ? Colors.white : ArcadeTheme.backgroundColor;
+    String label = _isRunning ? 'STOP SERVER' : 'START SERVER';
+    IconData icon = _isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: ScalePressButton(
         onTap: _toggleServer,
         child: Container(
-          height: 64,
+          height: 56,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: _isRunning 
-                ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                : [ArcadeTheme.primaryColor, ArcadeTheme.secondaryColor],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (_isRunning ? const Color(0xFFEF4444) : ArcadeTheme.primaryColor).withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              )
-            ],
+            borderRadius: BorderRadius.circular(12),
+            color: bg,
           ),
           child: Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _isRunning ? Icons.power_settings_new_rounded : Icons.sports_esports_rounded,
-                  color: Colors.white,
-                  size: 26,
+                  icon,
+                  color: fg,
+                  size: 22,
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  _isRunning ? 'SHUTDOWN ARCADE' : 'LAUNCH ARCADE',
+                  label,
                   style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 18,
+                    color: fg,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.8,
                   ),
@@ -724,34 +640,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ),
       ),
-    ).animate(target: _isRunning ? 0 : 1).shimmer(duration: 3.seconds);
+    );
   }
 
   Widget _buildGamesSection() {
     final games = _kernel.availableGames;
-    return Container(
+    return ArcadeCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: ArcadeTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'AVAILABLE PLUGINS',
+            'GAMES',
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.bold,
               fontSize: 11,
-              color: Colors.white38,
+              color: ArcadeTheme.textSecondary,
               letterSpacing: 1.2,
             ),
           ),
@@ -760,8 +664,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'No active game plugins found.',
-                style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 13),
+                'No games installed.',
+                style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 13),
               ),
             )
           else
@@ -778,12 +682,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: ArcadeTheme.primaryColor.withValues(alpha: 0.1),
+                        color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
                         Icons.sports_esports_rounded,
-                        color: ArcadeTheme.primaryColor,
+                        color: ArcadeTheme.textPrimary,
                         size: 22,
                       ),
                     ),
@@ -797,7 +701,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: ArcadeTheme.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -805,7 +709,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             'Version ${game.version} • by ${game.author}',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 11,
-                              color: Colors.white38,
+                              color: ArcadeTheme.textSecondary,
                             ),
                           ),
                         ],
@@ -822,7 +726,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: ArcadeTheme.secondaryColor,
+                          color: ArcadeTheme.textPrimary,
                         ),
                       ),
                     ),

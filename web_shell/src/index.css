@@ -467,9 +467,10 @@ button:hover {
   background: rgba(13, 16, 26, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: var(--radius-l);
-  padding: var(--space-xl) var(--space-l);
+  padding: var(--space-l) var(--space-l);
   width: 100%;
   max-width: 400px;
+  min-height: 490px; /* Prevents vertical resizing jumps when switching tabs in portrait */
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
@@ -478,7 +479,120 @@ button:hover {
   backdrop-filter: blur(28px);
   position: relative;
   overflow: hidden;
+  transition: all var(--transition-normal);
 }
+
+.identity-brand-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.identity-form-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1; /* Fills remaining height and centers form content */
+}
+
+.identity-logo {
+  /* Overridden responsively */
+}
+
+.identity-title {
+  font-size: 26px;
+  font-weight: 900;
+  margin: 12px 0 6px;
+}
+
+.identity-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Widescreen Landscape Responsive overrides for short mobile viewports */
+@media (max-height: 480px) and (orientation: landscape) {
+  .identity-panel {
+    flex-direction: row !important;
+    max-width: 680px !important;
+    height: 330px !important; /* Fixed height to completely eliminate box jumping */
+    min-height: 330px !important;
+    padding: var(--space-m) !important;
+    gap: var(--space-m) !important;
+    align-items: stretch !important;
+  }
+
+  .identity-brand-group {
+    flex: 1 !important;
+    margin-bottom: 0 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding-right: var(--space-m) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  .identity-form-group {
+    flex: 1.3 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 8px !important;
+  }
+
+  .identity-logo {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .identity-title {
+    font-size: 18px !important;
+    margin: 6px 0 2px !important;
+  }
+
+  .identity-subtitle {
+    font-size: 10px !important;
+    max-width: 180px !important;
+  }
+
+  .login-tabs-header {
+    margin-bottom: 10px !important;
+  }
+
+  .login-tab-btn {
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
+
+  .identity-input {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+  }
+
+  .avatar-color-picker {
+    gap: 6px !important;
+  }
+
+  .avatar-color-circle {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .identity-submit-btn {
+    padding: 10px 16px !important;
+    font-size: 12px !important;
+    margin-top: 4px !important;
+  }
+
+  .qr-reader-container {
+    max-height: 160px !important;
+  }
+}
+
 
 
 /* Selector Grid for game titles */
@@ -2246,27 +2360,122 @@ button:hover {
   padding: 0 4px;
 }
 
-/* ---- Join Room card: compress when viewport is short ---- */
-@media (max-height: 680px) {
+/* ---- Compact Height Mode (Viewport Height < 650px) ---- */
+@media (max-height: 650px) {
+  /* Step 1 & 2: Reduce spacing and padding */
+  .home-left-panel {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+  
+  .home-profile-card {
+    padding: 6px 10px !important;
+    border-radius: 10px !important;
+  }
+  
+  .home-profile-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+  }
+  
+  /* Step 3 & 4: Reduce header and logo size */
+  .home-title {
+    font-size: 18px !important;
+  }
+  
+  .home-subtitle {
+    font-size: 10px !important;
+  }
+  
+  /* Compress Join Room card and guarantee visibility */
   .home-join-card {
-    padding: 14px 16px;
-    gap: 10px;
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    border-radius: 12px !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
-
+  
+  .home-join-eyebrow {
+    font-size: 9px !important;
+  }
+  
   .home-join-heading {
-    font-size: 15px;
+    font-size: 13px !important;
   }
-
+  
   .home-join-desc {
-    display: none;
+    display: none !important; /* Hide description to conserve space */
   }
-
-  .home-join-hint {
-    display: none;
+  
+  .home-join-field {
+    border-radius: 8px !important;
   }
-
+  
+  .home-join-input {
+    padding: 8px 10px 8px 0 !important;
+    font-size: 13px !important;
+  }
+  
+  .home-join-hash {
+    font-size: 14px !important;
+    padding: 0 6px 0 10px !important;
+  }
+  
   .home-join-btn {
-    padding: 11px 16px;
+    padding: 10px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+  }
+  
+  .home-join-hint {
+    display: none !important; /* Hide hint to conserve space */
+  }
+  
+  /* Right panel: reduce title/label spacing */
+  .home-right-header {
+    padding: 10px 16px 8px !important;
+  }
+  
+  .home-games-header {
+    padding: 8px 16px 4px !important;
+  }
+  
+  .home-game-scroll-area {
+    padding: 0 16px 12px !important;
+  }
+  
+  .home-game-grid {
+    gap: 10px !important;
+  }
+  
+  .home-game-card {
+    border-radius: 12px !important;
+  }
+  
+  .home-game-body {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+  
+  .home-game-name {
+    font-size: 13px !important;
+  }
+  
+  .home-game-play-btn {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+  }
+}
+
+/* Step 5: Temporarily hide decorative header / branding under 520px height */
+@media (max-height: 520px) {
+  .home-brand-header {
+    display: none !important;
   }
 }
 

@@ -79,14 +79,14 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 18),
+            const Icon(Icons.check_circle_rounded, color: ArcadeTheme.successColor, size: 18),
             const SizedBox(width: 8),
             Text(message),
           ],
         ),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
-        backgroundColor: ArcadeTheme.surfaceColor,
+        backgroundColor: ArcadeTheme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
@@ -115,28 +115,20 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [ArcadeTheme.backgroundColor, Color(0xFF020617)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _players.isEmpty
-                        ? _buildEmptyState()
-                        : _buildPlayersList(),
-              ),
-            ],
-          ),
+      backgroundColor: ArcadeTheme.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _players.isEmpty
+                      ? _buildEmptyState()
+                      : _buildPlayersList(),
+            ),
+          ],
         ),
       ),
     );
@@ -152,27 +144,30 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'PLAYERS DIRECTORY',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.0,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PLAYERS',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: ArcadeTheme.textPrimary,
+                    letterSpacing: 1.0,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Scan QR codes to easily log in on phone browsers',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  color: Colors.white38,
+                const SizedBox(height: 2),
+                Text(
+                  'Scan QR code to log in on your phone',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: ArcadeTheme.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -187,16 +182,16 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
           const Icon(Icons.people_outline_rounded, size: 64, color: Colors.white24),
           const SizedBox(height: 16),
           Text(
-            'No registered players found',
+            'No players registered',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.white38,
+              color: ArcadeTheme.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'New players will register upon joining from their browser.',
+            'Players will appear here after they join.',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               color: Colors.white24,
@@ -219,26 +214,15 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
         final avatarColor = _resolveAvatarColor(player.avatar);
         final loginUrl = 'http://${widget.ipAddress}:8080/?login_id=${player.id}';
 
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
+        return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: ArcadeTheme.surfaceColor,
-            borderRadius: BorderRadius.circular(16),
+            color: ArcadeTheme.cardColor,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isExpanded ? avatarColor.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05),
+              color: isExpanded ? ArcadeTheme.primaryColor : Colors.white.withValues(alpha: 0.05),
               width: 1,
             ),
-            boxShadow: isExpanded
-                ? [
-                    BoxShadow(
-                      color: avatarColor.withValues(alpha: 0.15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : [],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -250,7 +234,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                     _expandedPlayerId = isExpanded ? null : player.id;
                   });
                 },
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -284,7 +268,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: Colors.white,
+                                color: ArcadeTheme.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -292,7 +276,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                               'ID: ${player.id.substring(0, 8)}...',
                               style: GoogleFonts.firaCode(
                                 fontSize: 11,
-                                color: Colors.white30,
+                                color: ArcadeTheme.textSecondary,
                               ),
                             ),
                           ],
@@ -302,20 +286,20 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.1),
+                          color: ArcadeTheme.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.2), width: 1),
+                          border: Border.all(color: ArcadeTheme.primaryColor.withValues(alpha: 0.2), width: 1),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 14),
+                            const Icon(Icons.emoji_events_rounded, color: ArcadeTheme.primaryColor, size: 14),
                             const SizedBox(width: 4),
                             Text(
                               '$totalWins Wins',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.amber,
+                                color: ArcadeTheme.primaryColor,
                               ),
                             ),
                           ],
@@ -324,7 +308,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                       const SizedBox(width: 12),
                       Icon(
                         isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white30,
+                        color: ArcadeTheme.textSecondary,
                       ),
                     ],
                   ),
@@ -348,22 +332,22 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildDetailField(
-                                  label: 'FULL PLAYER ID',
+                                  label: 'PLAYER ID',
                                   value: player.id,
                                   onCopy: () => _copyToClipboard(
                                     context,
                                     player.id,
-                                    'Player ID copied to clipboard!',
+                                    'ID copied!',
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 _buildDetailField(
-                                  label: 'QUICK LOGIN URL',
+                                  label: 'LOGIN LINK',
                                   value: loginUrl,
                                   onCopy: () => _copyToClipboard(
                                     context,
                                     loginUrl,
-                                    'Quick Login URL copied to clipboard!',
+                                    'Login link copied!',
                                   ),
                                 ),
                               ],
@@ -378,13 +362,6 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 4),
-                                    )
-                                  ],
                                 ),
                                 child: QrImageView(
                                   data: loginUrl,
@@ -406,7 +383,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
-                                  color: Colors.white54,
+                                  color: ArcadeTheme.textSecondary,
                                   letterSpacing: 0.8,
                                 ),
                               ),
@@ -421,7 +398,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
-                          color: Colors.white30,
+                          color: ArcadeTheme.textSecondary,
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -451,7 +428,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
           style: GoogleFonts.plusJakartaSans(
             fontSize: 10,
             fontWeight: FontWeight.w900,
-            color: Colors.white30,
+            color: ArcadeTheme.textSecondary,
             letterSpacing: 0.8,
           ),
         ),
@@ -461,7 +438,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(color: Colors.white10),
           ),
           child: Row(
             children: [
@@ -470,7 +447,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                   value,
                   style: GoogleFonts.firaCode(
                     fontSize: 12,
-                    color: Colors.white70,
+                    color: ArcadeTheme.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -497,7 +474,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Text(
-          'No individual game wins recorded yet.',
+          'No game wins recorded yet.',
           style: GoogleFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
         ),
       );
@@ -509,15 +486,13 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
       children: gameWins.entries.map((entry) {
         final gameId = entry.key;
         final wins = entry.value;
-        final isUno = gameId.toLowerCase() == 'uno';
-        final gameColor = isUno ? ArcadeTheme.secondaryColor : ArcadeTheme.primaryColor;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: gameColor.withValues(alpha: 0.05),
+            color: Colors.white.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: gameColor.withValues(alpha: 0.15)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,7 +503,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 9,
                   fontWeight: FontWeight.w900,
-                  color: gameColor.withValues(alpha: 0.7),
+                  color: ArcadeTheme.textSecondary,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -538,7 +513,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: ArcadeTheme.textPrimary,
                 ),
               ),
             ],

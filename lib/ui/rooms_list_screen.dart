@@ -66,9 +66,9 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('TERMINATE ROOM ${room.code}?'),
-        content: Text(
-          'Are you sure you want to terminate this room? Players will be evicted and disconnected.',
+        title: Text('CLOSE ROOM ${room.code}?'),
+        content: const Text(
+          'Are you sure you want to close this room? Players will be disconnected.',
         ),
         actions: [
           TextButton(
@@ -78,10 +78,10 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: ArcadeTheme.errorColor,
               foregroundColor: Colors.white,
             ),
-            child: const Text('TERMINATE'),
+            child: const Text('CLOSE ROOM'),
           ),
         ],
       ),
@@ -95,15 +95,15 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Room ${room.code} terminated successfully.'),
-            backgroundColor: ArcadeTheme.surfaceColor,
+            content: Text('Room ${room.code} closed.'),
+            backgroundColor: ArcadeTheme.cardColor,
           ),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to terminate room: $e')),
+          SnackBar(content: Text('Failed to close room: $e')),
         );
       }
     }
@@ -132,48 +132,40 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
   Color _getStatusColor(RoomStatus status) {
     switch (status) {
       case RoomStatus.waiting:
-        return ArcadeTheme.primaryColor;
+        return ArcadeTheme.primaryColor; // Muted Gold
       case RoomStatus.active:
-        return ArcadeTheme.accentColor;
+        return ArcadeTheme.successColor; // Green (Active/Connected)
       case RoomStatus.finished:
-        return Colors.white30;
+        return Colors.white30; // Muted Gray
       case RoomStatus.abandoned:
-        return const Color(0xFFEF4444);
+        return ArcadeTheme.errorColor; // Red (Error)
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [ArcadeTheme.backgroundColor, Color(0xFF020617)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    _loadRooms();
-                  },
-                  backgroundColor: ArcadeTheme.surfaceColor,
-                  color: ArcadeTheme.primaryColor,
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _rooms.isEmpty
-                          ? _buildEmptyState()
-                          : _buildRoomsList(),
-                ),
+      backgroundColor: ArcadeTheme.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  _loadRooms();
+                },
+                backgroundColor: ArcadeTheme.surfaceColor,
+                color: ArcadeTheme.primaryColor,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _rooms.isEmpty
+                        ? _buildEmptyState()
+                        : _buildRoomsList(),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -189,27 +181,30 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ACTIVE ROOMS',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.0,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ACTIVE GAMES',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: ArcadeTheme.textPrimary,
+                    letterSpacing: 1.0,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Monitor and manage running multiplayer matches',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  color: Colors.white38,
+                const SizedBox(height: 2),
+                Text(
+                  'View and manage active game rooms',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: ArcadeTheme.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -231,12 +226,12 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.white38,
+                color: ArcadeTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Rooms will appear here once players launch a game.',
+              'Rooms will appear here when players start a game.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 color: Colors.white24,
@@ -256,231 +251,222 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
       itemBuilder: (context, index) {
         final room = _rooms[index];
         final statusColor = _getStatusColor(room.status);
-        final isUno = room.game.id == 'uno';
-        final accentColor = isUno ? ArcadeTheme.secondaryColor : ArcadeTheme.primaryColor;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: ArcadeTheme.surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              )
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top strip: Game name, Code, Status badge, Evict button
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: ArcadeCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top strip: Game name, Code, Status badge, Evict button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.sports_esports_rounded, color: ArcadeTheme.textPrimary),
                       ),
-                      child: const Icon(Icons.sports_esports_rounded, color: Colors.white70),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                room.game.name.toUpperCase(),
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
-                                ),
-                                child: Text(
-                                  room.status.name.toUpperCase(),
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                    color: statusColor,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                'CODE: ',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white30,
-                                ),
-                              ),
-                              Text(
-                                room.code,
-                                style: GoogleFonts.firaCode(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: ArcadeTheme.accentColor,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              InkWell(
-                                onTap: () {
-                                  final joinUrl = 'http://${widget.ipAddress}:8080/?room=${room.code}';
-                                  Clipboard.setData(ClipboardData(text: joinUrl));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: [
-                                          const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 18),
-                                          const SizedBox(width: 8),
-                                          const Text('Room invite URL copied to clipboard!'),
-                                        ],
-                                      ),
-                                      behavior: SnackBarBehavior.floating,
-                                      backgroundColor: ArcadeTheme.surfaceColor,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(4),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.copy_rounded, size: 11, color: Colors.white54),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'COPY LINK',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white54,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444)),
-                      onPressed: () => _terminateRoom(context, room),
-                      tooltip: 'Terminate Room',
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // Bottom strip: Players detail list
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'PLAYERS (${room.players.length}/${room.game.maxPlayers})',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white30,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (room.players.isEmpty)
-                      Text(
-                        'No players connected.',
-                        style: GoogleFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
-                      )
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: room.players.map((p) {
-                          final avatarColor = _resolveAvatarColor(p.avatar);
-                          final isHost = p.id == room.hostId;
-
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isHost ? Colors.amber.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: BoxDecoration(
-                                    color: avatarColor,
-                                    shape: BoxShape.circle,
+                                Expanded(
+                                  child: Text(
+                                    room.game.name.toUpperCase(),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: ArcadeTheme.textPrimary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 9,
-                                      ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
+                                  ),
+                                  child: Text(
+                                    room.status.name.toUpperCase(),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      color: statusColor,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
                                 Text(
-                                  p.name,
+                                  'ROOM CODE: ',
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white70,
+                                    color: ArcadeTheme.textSecondary,
                                   ),
                                 ),
-                                if (isHost) ...[
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.star_rounded, color: Colors.amber, size: 12),
-                                ],
+                                Text(
+                                  room.code,
+                                  style: GoogleFonts.firaCode(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: ArcadeTheme.primaryColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                InkWell(
+                                  onTap: () {
+                                    final joinUrl = 'http://${widget.ipAddress}:8080/?room=${room.code}';
+                                    Clipboard.setData(ClipboardData(text: joinUrl));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.check_circle_rounded, color: ArcadeTheme.successColor, size: 18),
+                                            const SizedBox(width: 8),
+                                            const Text('Link copied!'),
+                                          ],
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                        backgroundColor: ArcadeTheme.cardColor,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.copy_rounded, size: 11, color: Colors.white54),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'COPY LINK',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: ArcadeTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                          );
-                        }).toList(),
+                          ],
+                        ),
                       ),
-                  ],
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever_rounded, color: ArcadeTheme.errorColor),
+                        onPressed: () => _terminateRoom(context, room),
+                        tooltip: 'Close Room',
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const Divider(height: 1),
+                // Bottom strip: Players detail list
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PLAYERS (${room.players.length}/${room.game.maxPlayers})',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: ArcadeTheme.textSecondary,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (room.players.isEmpty)
+                        Text(
+                          'No players connected.',
+                          style: GoogleFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: room.players.map((p) {
+                            final avatarColor = _resolveAvatarColor(p.avatar);
+                            final isHost = p.id == room.hostId;
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isHost ? ArcadeTheme.primaryColor.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 18,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: avatarColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    p.name,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: ArcadeTheme.textPrimary,
+                                    ),
+                                  ),
+                                  if (isHost) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.star_rounded, color: ArcadeTheme.primaryColor, size: 12),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

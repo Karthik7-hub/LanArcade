@@ -2,6 +2,37 @@ import { useStore } from './store';
 import { PlatformEvent } from '../shared/types';
 import { IdentityManager } from './IdentityManager';
 
+export function getRoomCodeFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const roomQuery = params.get('room');
+  if (roomQuery) return roomQuery;
+
+  const match = window.location.pathname.match(/\/room\/([a-zA-Z0-9]+)/);
+  if (match) {
+    return match[1];
+  }
+  return null;
+}
+
+export function clearRoomFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  let changed = false;
+  if (urlParams.has('room')) {
+    urlParams.delete('room');
+    changed = true;
+  }
+  let newPath = window.location.pathname;
+  if (/\/room\/[a-zA-Z0-9]+/.test(newPath)) {
+    newPath = '/';
+    changed = true;
+  }
+  if (changed) {
+    const searchString = urlParams.toString();
+    const finalUrl = `${newPath}${searchString ? '?' + searchString : ''}`;
+    window.history.replaceState({}, '', finalUrl);
+  }
+}
+
 class WebSocketClient {
   private socket: WebSocket | null = null;
   private url: string = '';
@@ -100,8 +131,7 @@ class WebSocketClient {
       case 'player.identified':
         store.setPlayer(event.payload);
         IdentityManager.savePlayer(event.payload);
-        const params = new URLSearchParams(window.location.search);
-        const roomCode = params.get('room');
+        const roomCode = getRoomCodeFromUrl();
         if (roomCode) {
           console.log('Auto-joining room:', roomCode);
           this.send('room.join', { code: roomCode });
@@ -116,15 +146,20 @@ class WebSocketClient {
           } else if (event.payload.publicGameState) {
             store.setPublicGameState(event.payload.publicGameState);
           }
-          const urlParams = new URLSearchParams(window.location.search);
-          if (urlParams.get('room') !== event.payload.code) {
-            urlParams.set('room', event.payload.code);
-            window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+          const currentRoomCode = getRoomCodeFromUrl();
+          if (currentRoomCode !== event.payload.code) {
+            if (window.location.pathname.startsWith('/room/')) {
+              window.history.replaceState({}, '', `/room/${event.payload.code}${window.location.search}`);
+            } else {
+              const urlParams = new URLSearchParams(window.location.search);
+              urlParams.set('room', event.payload.code);
+              window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+            }
           }
         } else {
           store.setPublicGameState(null);
           store.setPrivateGameState(null);
-          window.history.replaceState({}, '', window.location.pathname);
+          clearRoomFromUrl();
         }
         break;
       case 'game.public_state':
@@ -136,6 +171,12 @@ class WebSocketClient {
       case 'system.error':
         console.error('System Error:', event.payload);
         store.setErrorAlert(String(event.payload));
+        if (String(event.payload).toLowerCase().includes('room not found')) {
+          store.setRoom(null);
+          store.setPublicGameState(null);
+          store.setPrivateGameState(null);
+          clearRoomFromUrl();
+        }
         break;
       default:
         console.warn('Unknown event type:', event.type);

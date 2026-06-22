@@ -62,8 +62,8 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Auto-cleanup policies saved!'),
-        backgroundColor: ArcadeTheme.accentColor,
+        content: Text('Settings saved!'),
+        backgroundColor: ArcadeTheme.cardColor,
       ),
     );
     _loadData();
@@ -73,15 +73,9 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'CONFIRM CLEANUP',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.bold,
-            color: ArcadeTheme.secondaryColor,
-          ),
-        ),
+        title: const Text('DELETE DATA?'),
         content: Text(
-          'Are you sure you want to perform this cleanup action? $message',
+          'Are you sure you want to delete this data? This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -91,10 +85,10 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: ArcadeTheme.primaryColor,
+              backgroundColor: ArcadeTheme.errorColor,
               foregroundColor: Colors.white,
             ),
-            child: const Text('PROCEED'),
+            child: const Text('DELETE'),
           ),
         ],
       ),
@@ -108,8 +102,8 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cleanup complete!'),
-          backgroundColor: ArcadeTheme.accentColor,
+          content: Text('Data deleted.'),
+          backgroundColor: ArcadeTheme.cardColor,
         ),
       );
       _loadData();
@@ -127,14 +121,11 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
           return AlertDialog(
             title: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                const Icon(Icons.warning_amber_rounded, color: ArcadeTheme.errorColor, size: 28),
                 const SizedBox(width: 8),
-                Text(
-                  'DANGER ZONE',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.redAccent,
-                  ),
+                const Text(
+                  'DELETE EVERYTHING?',
+                  style: TextStyle(color: ArcadeTheme.errorColor),
                 ),
               ],
             ),
@@ -143,16 +134,16 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'This will permanently remove all saved matches, reconnect states, room history, and event logs.\n\n'
-                  'Player profiles, achievements, and statistics will NOT be deleted.\n\n'
-                  'This action cannot be undone. To confirm, type "DELETE" below:',
+                  'This will permanently delete all rooms, logs, and reconnect data. '
+                  'Player stats and profiles will NOT be deleted. '
+                  'This cannot be undone. Type "DELETE" to confirm:',
                   style: TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: textController,
                   autofocus: true,
-                  style: GoogleFonts.firaCode(color: Colors.white),
+                  style: GoogleFonts.firaCode(color: ArcadeTheme.textPrimary),
                   decoration: const InputDecoration(
                     hintText: 'DELETE',
                   ),
@@ -172,9 +163,9 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               ElevatedButton(
                 onPressed: canDelete ? () => Navigator.of(context).pop(true) : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEF4444),
+                  backgroundColor: ArcadeTheme.errorColor,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.3),
+                  disabledBackgroundColor: ArcadeTheme.errorColor.withValues(alpha: 0.3),
                 ),
                 child: const Text('DELETE ALL'),
               ),
@@ -192,8 +183,8 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Full platform purge completed!'),
-          backgroundColor: ArcadeTheme.accentColor,
+          content: Text('All data deleted.'),
+          backgroundColor: ArcadeTheme.cardColor,
         ),
       );
       _loadData();
@@ -203,9 +194,10 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: ArcadeTheme.backgroundColor,
       appBar: AppBar(
         title: Text(
-          'STORAGE & CLEANUP',
+          'STORAGE SETTINGS',
           style: GoogleFonts.blackOpsOne(
             fontSize: 20,
             letterSpacing: 1.5,
@@ -220,14 +212,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [ArcadeTheme.backgroundColor, Color(0xFF020617)],
-          ),
-        ),
+      body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: ArcadeTheme.primaryColor))
             : SingleChildScrollView(
@@ -253,53 +238,51 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   }
 
   Widget _buildRoomsListSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.grid_view_rounded, color: ArcadeTheme.secondaryColor, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'ROOM STORAGE MANAGEMENT',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+    return ArcadeCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.grid_view_rounded, color: ArcadeTheme.primaryColor, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'SAVED ROOMS',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_rooms.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    'No rooms currently stored in the database.',
-                    style: TextStyle(color: Colors.white38, fontSize: 13, fontStyle: FontStyle.italic),
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _rooms.length,
-                separatorBuilder: (context, index) => const Divider(height: 20),
-                itemBuilder: (context, index) {
-                  final room = _rooms[index];
-                  return _buildRoomRow(room);
-                },
               ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_rooms.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'No rooms currently stored in the database.',
+                  style: TextStyle(color: Colors.white38, fontSize: 13, fontStyle: FontStyle.italic),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _rooms.length,
+              separatorBuilder: (context, index) => const Divider(height: 20),
+              itemBuilder: (context, index) {
+                final room = _rooms[index];
+                return _buildRoomRow(room);
+              },
+            ),
+        ],
       ),
     );
   }
@@ -322,7 +305,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
         statusLabel = 'WAITING';
         break;
       case RoomStatus.active:
-        statusColor = Colors.greenAccent;
+        statusColor = ArcadeTheme.successColor;
         statusLabel = 'ACTIVE';
         break;
       case RoomStatus.finished:
@@ -330,7 +313,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
         statusLabel = 'FINISHED';
         break;
       case RoomStatus.abandoned:
-        statusColor = Colors.redAccent;
+        statusColor = ArcadeTheme.errorColor;
         statusLabel = 'ABANDONED';
         break;
     }
@@ -363,7 +346,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                     child: Text(
                       '($gameName)',
                       style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white70,
+                        color: ArcadeTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -378,30 +361,30 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                   _buildBadge(statusLabel, statusColor),
                   const SizedBox(width: 6),
                   if (room.isActiveInMemory)
-                    _buildBadge('IN-MEMORY', ArcadeTheme.accentColor)
+                    _buildBadge('ACTIVE', ArcadeTheme.successColor)
                   else
-                    _buildBadge('DB ONLY', Colors.white30),
+                    _buildBadge('SAVED', Colors.white30),
                   const SizedBox(width: 10),
-                  Icon(Icons.people_alt_rounded, size: 12, color: Colors.white38),
+                  const Icon(Icons.people_alt_rounded, size: 12, color: Colors.white38),
                   const SizedBox(width: 4),
                   Text(
                     '${room.playersCount} Players',
-                    style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 11),
+                    style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
                 formattedTime,
-                style: GoogleFonts.plusJakartaSans(color: Colors.white30, fontSize: 11),
+                style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
               ),
             ],
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent, size: 22),
+          icon: const Icon(Icons.delete_sweep_outlined, color: ArcadeTheme.errorColor, size: 22),
           onPressed: () => _confirmPurgeRoom(room),
-          tooltip: 'Purge Room Storage',
+          tooltip: 'Delete Room Data',
         ),
       ],
     );
@@ -445,16 +428,10 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'PURGE ROOM STORAGE',
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.redAccent,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text('DELETE ROOM DATA?'),
         content: Text(
-          'Are you sure you want to permanently delete Room ${room.code.toUpperCase()}?\n\n'
-          'All database logs and in-memory game state will be destroyed immediately. Any active players will be returned to the lobby.',
+          'Are you sure you want to delete Room ${room.code.toUpperCase()}?\n\n'
+          'All saved data for this room will be deleted.',
         ),
         actions: [
           TextButton(
@@ -464,10 +441,10 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+              backgroundColor: ArcadeTheme.errorColor,
               foregroundColor: Colors.white,
             ),
-            child: const Text('PURGE'),
+            child: const Text('DELETE'),
           ),
         ],
       ),
@@ -481,8 +458,8 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Room ${room.code.toUpperCase()} purged successfully.'),
-          backgroundColor: ArcadeTheme.accentColor,
+          content: Text('Room ${room.code.toUpperCase()} data deleted.'),
+          backgroundColor: ArcadeTheme.cardColor,
         ),
       );
       _loadData();
@@ -490,36 +467,34 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   }
 
   Widget _buildStatsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'DATABASE STORAGE USED',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white70, fontSize: 13),
+    return ArcadeCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'STORAGE USED',
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: ArcadeTheme.textPrimary, fontSize: 13),
+              ),
+              Text(
+                '${_stats['storageUsedMb']} MB',
+                style: GoogleFonts.firaCode(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: ArcadeTheme.primaryColor,
                 ),
-                Text(
-                  '${_stats['storageUsedMb']} MB',
-                  style: GoogleFonts.firaCode(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: ArcadeTheme.primaryColor,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-            _buildStatRow('Completed Games', _stats['completedGames']),
-            _buildStatRow('Abandoned Rooms', _stats['abandonedRooms']),
-            _buildStatRow('Saved Reconnect States', _stats['reconnectStates']),
-            _buildStatRow('Event Logs', _stats['eventLogs']),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          _buildStatRow('Completed Games', _stats['completedGames']),
+          _buildStatRow('Abandoned Rooms', _stats['abandonedRooms']),
+          _buildStatRow('Saved Reconnect States', _stats['reconnectStates']),
+          _buildStatRow('Event Logs', _stats['eventLogs']),
+        ],
       ),
     );
   }
@@ -530,10 +505,10 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.plusJakartaSans(color: Colors.white60, fontSize: 14)),
+          Text(label, style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 14)),
           Text(
             value.toString(),
-            style: GoogleFonts.firaCode(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+            style: GoogleFonts.firaCode(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
           ),
         ],
       ),
@@ -541,98 +516,96 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   }
 
   Widget _buildAutoCleanupSettings() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.auto_delete_outlined, color: ArcadeTheme.accentColor, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'AUTOMATIC CLEANUP',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.0,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+    return ArcadeCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_delete_outlined, color: ArcadeTheme.primaryColor, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'AUTO CLEANUP',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Switch(
-                  value: _autoCleanup,
-                  activeThumbColor: ArcadeTheme.accentColor,
-                  activeTrackColor: ArcadeTheme.accentColor.withValues(alpha: 0.25),
-                  onChanged: (val) {
-                    setState(() {
-                      _autoCleanup = val;
-                    });
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_autoCleanup) ...[
-              _buildDropdownRow(
-                'Completed Games',
-                'Delete finished matches after:',
-                _completedDays,
-                {
-                  -1: 'Never',
-                  1: '24 Hours',
-                  3: '3 Days',
-                  7: '7 Days',
-                  30: '30 Days',
-                },
-                (val) => setState(() => _completedDays = val ?? 7),
               ),
-              _buildDropdownRow(
-                'Abandoned Rooms',
-                'Delete empty, inactive rooms after:',
-                _abandonedHours,
-                {
-                  -1: 'Never',
-                  24: '24 Hours',
-                  72: '3 Days',
-                  168: '7 Days',
-                  720: '30 Days',
+              Switch(
+                value: _autoCleanup,
+                activeThumbColor: ArcadeTheme.backgroundColor,
+                activeTrackColor: ArcadeTheme.primaryColor,
+                inactiveThumbColor: ArcadeTheme.textSecondary,
+                inactiveTrackColor: Colors.white10,
+                onChanged: (val) {
+                  setState(() {
+                    _autoCleanup = val;
+                  });
                 },
-                (val) => setState(() => _abandonedHours = val ?? 24),
-              ),
-              _buildDropdownRow(
-                'Reconnect States',
-                'Delete disconnected recovery states after:',
-                _reconnectHours,
-                {
-                  -1: 'Never',
-                  24: '24 Hours',
-                  48: '48 Hours',
-                  168: '7 Days',
-                  720: '30 Days',
-                },
-                (val) => setState(() => _reconnectHours = val ?? 48),
               ),
             ],
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveSettings,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-              ),
-              child: const Text('SAVE POLICIES'),
+          ),
+          const SizedBox(height: 16),
+          if (_autoCleanup) ...[
+            _buildDropdownRow(
+              'Finished Games',
+              'Delete finished games after:',
+              _completedDays,
+              {
+                -1: 'Never',
+                1: '24 Hours',
+                3: '3 Days',
+                7: '7 Days',
+                30: '30 Days',
+              },
+              (val) => setState(() => _completedDays = val ?? 7),
+            ),
+            _buildDropdownRow(
+              'Empty Rooms',
+              'Delete empty rooms after:',
+              _abandonedHours,
+              {
+                -1: 'Never',
+                24: '24 Hours',
+                72: '3 Days',
+                168: '7 Days',
+                720: '30 Days',
+              },
+              (val) => setState(() => _abandonedHours = val ?? 24),
+            ),
+            _buildDropdownRow(
+              'Disconnected Players data',
+              'Delete disconnected data after:',
+              _reconnectHours,
+              {
+                -1: 'Never',
+                24: '24 Hours',
+                48: '48 Hours',
+                168: '7 Days',
+                720: '30 Days',
+              },
+              (val) => setState(() => _reconnectHours = val ?? 48),
             ),
           ],
-        ),
+          const SizedBox(height: 20),
+          ArcadeButton.primary(
+            label: 'SAVE SETTINGS',
+            onPressed: _saveSettings,
+            isFullWidth: true,
+          ),
+        ],
       ),
     );
   }
@@ -655,11 +628,11 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
         children: [
           Text(
             title,
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
           ),
           Text(
             subtitle,
-            style: GoogleFonts.plusJakartaSans(color: Colors.white30, fontSize: 11),
+            style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
           ),
           const SizedBox(height: 8),
           Container(
@@ -675,14 +648,14 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                 isExpanded: true,
                 dropdownColor: ArcadeTheme.surfaceColor,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
-                style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 14),
+                style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textPrimary, fontSize: 14),
                 onChanged: onChanged,
                 items: options.entries
                     .map((e) => DropdownMenuItem<int>(
                           value: e.key,
                           child: Text(e.value),
                         ))
-                    .toList(),
+                     .toList(),
               ),
             ),
           ),
@@ -692,52 +665,50 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   }
 
   Widget _buildCleanupActions() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.cleaning_services_outlined, color: ArcadeTheme.primaryColor, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'MANUAL CLEANUP OPTIONS',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+    return ArcadeCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.cleaning_services_outlined, color: ArcadeTheme.primaryColor, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'DELETE DATA MANUALLY',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildActionRow(
-              'Clear Completed Games',
-              'Deletes finished matches. Preserves statistics, profiles, and achievements.',
-              () => _triggerCleanup(widget.kernel.clearCompletedGames, 'This removes finished matches history and replay data.'),
-            ),
-            _buildActionRow(
-              'Clear Abandoned Rooms',
-              'Deletes rooms where all players disconnected without finishing.',
-              () => _triggerCleanup(widget.kernel.clearAbandonedRooms, 'This removes abandoned matches history.'),
-            ),
-            _buildActionRow(
-              'Clear Expired Reconnect States',
-              'Deletes room recovery data for matches not active in-memory.',
-              () => _triggerCleanup(widget.kernel.clearExpiredReconnectStates, 'Players will not be able to reconnect to these old matches.'),
-            ),
-            _buildActionRow(
-              'Clear Event Logs',
-              'Purges all gameplay action event logs across rooms.',
-              () => _triggerCleanup(widget.kernel.clearEventLogs, 'This will remove event logs and replay action lists.'),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildActionRow(
+            'Delete Finished Games',
+            'Deletes finished matches. Preserves statistics, profiles, and achievements.',
+            () => _triggerCleanup(widget.kernel.clearCompletedGames, 'This removes finished matches history.'),
+          ),
+          _buildActionRow(
+            'Delete Empty Rooms',
+            'Deletes rooms where all players disconnected without finishing.',
+            () => _triggerCleanup(widget.kernel.clearAbandonedRooms, 'This removes abandoned matches history.'),
+          ),
+          _buildActionRow(
+            'Delete Disconnected Players data',
+            'Deletes room recovery data for matches not active.',
+            () => _triggerCleanup(widget.kernel.clearExpiredReconnectStates, 'Players will not be able to reconnect to these old matches.'),
+          ),
+          _buildActionRow(
+            'Delete Event Logs',
+            'Purges all gameplay action event logs across rooms.',
+            () => _triggerCleanup(widget.kernel.clearEventLogs, 'This will remove event logs and replay action lists.'),
+          ),
+        ],
       ),
     );
   }
@@ -753,27 +724,20 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 11),
+                  style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 16),
-          OutlinedButton(
+          ArcadeButton.secondary(
+            label: 'CLEAR',
             onPressed: onTap,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            child: const Text('CLEAR'),
           ),
         ],
       ),
@@ -781,49 +745,40 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
   }
 
   Widget _buildDangerZone() {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Colors.redAccent, width: 1.2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.report_gmailerrorred_rounded, color: Colors.redAccent, size: 20),
-                const SizedBox(width: 12),
-                Text(
-                  'DANGER ZONE',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.0,
-                    color: Colors.redAccent,
-                  ),
+    return ArcadeCard(
+      border: Border.all(color: ArcadeTheme.errorColor, width: 1.2),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.report_gmailerrorred_rounded, color: ArcadeTheme.errorColor, size: 20),
+              const SizedBox(width: 12),
+              Text(
+                'DELETE EVERYTHING',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                  color: ArcadeTheme.errorColor,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Full cleanup will permanently delete all room data, reconnect states, and gameplay log tables.\n'
-              'Statistics, achievements, and player profiles are fully preserved.',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white54, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _triggerFullCleanup,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(50),
               ),
-              child: const Text('FULL PLATFORM CLEANUP'),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Full cleanup will permanently delete all room data, reconnect states, and gameplay log tables.\n'
+            'Statistics, achievements, and player profiles are fully preserved.',
+            style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          ArcadeButton.danger(
+            label: 'DELETE EVERYTHING',
+            onPressed: _triggerFullCleanup,
+            isFullWidth: true,
+          ),
+        ],
       ),
     );
   }

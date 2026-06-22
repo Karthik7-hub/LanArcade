@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from './shell/store';
-import { wsClient } from './shell/WebSocketClient';
+import { wsClient, getRoomCodeFromUrl, clearRoomFromUrl } from './shell/WebSocketClient';
 import { IdentityManager } from './shell/IdentityManager';
 import GameLoader from './plugin_runtime/GameLoader';
 import './plugin_runtime/ArcadeSDK'; // Initialize SDK
@@ -81,9 +81,38 @@ const App: React.FC = () => {
   const [editName, setEditName] = useState(player?.name || '');
   const [editColor, setEditColor] = useState(player?.avatar || 'default');
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const [showFsBanner, setShowFsBanner] = useState(false);
   const [isViewingLobby, setIsViewingLobby] = useState(() => {
     return localStorage.getItem('isViewingLobby') === 'true';
   });
+
+  const [customConfirm, setCustomConfirm] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+  } | null>(null);
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    options?: { confirmText?: string; cancelText?: string }
+  ) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setCustomConfirm(null);
+      },
+      confirmText: options?.confirmText ?? 'CONFIRM',
+      cancelText: options?.cancelText ?? 'CANCEL',
+    });
+  };
 
   // Modern Console settings states
   const [activeSettingsTab, setActiveSettingsTab] = useState<'gameplay' | 'audio' | 'display' | 'network' | 'storage' | 'accessibility' | 'about'>('gameplay');
@@ -139,16 +168,62 @@ const App: React.FC = () => {
     }
   }, [player]);
 
+  const attemptFullscreen = () => {
+    if (localStorage.getItem('lan_fullscreen') === 'true' && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.warn('Auto-fullscreen attempt deferred/failed:', err.message);
+        setShowFsBanner(true);
+      });
+    }
+  };
+
+  const handleRestoreFullscreen = () => {
+    document.documentElement.requestFullscreen()
+      .then(() => {
+        localStorage.setItem('lan_fullscreen', 'true');
+        localStorage.setItem('fullscreen_enabled', 'true');
+        setShowFsBanner(false);
+      })
+      .catch((err) => {
+        console.error(`Error restoring fullscreen: ${err.message}`);
+      });
+  };
+
+  const handleDismissFsBanner = () => {
+    localStorage.setItem('lan_fullscreen', 'false');
+    localStorage.setItem('fullscreen_enabled', 'false');
+    setShowFsBanner(false);
+  };
+
+  useEffect(() => {
+    if (room) {
+      attemptFullscreen();
+    }
+  }, [room]);
+
+  useEffect(() => {
+    if (room && room.status !== 'waiting') {
+      attemptFullscreen();
+    }
+  }, [room?.status]);
+
   useEffect(() => {
     const handleFsChange = () => {
-      // Only use the Fullscreen API — do NOT use window size heuristic
-      // (WebView fills screen naturally so size check always returns true)
-      setIsFullscreen(!!document.fullscreenElement);
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      if (localStorage.getItem('lan_fullscreen') === 'true' && !fs) {
+        setShowFsBanner(true);
+      } else if (fs) {
+        setShowFsBanner(false);
+      }
     };
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
-    // Initial check
+    
+    // Initial check & attempt
     handleFsChange();
+    attemptFullscreen();
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       document.removeEventListener('webkitfullscreenchange', handleFsChange);
@@ -164,12 +239,21 @@ const App: React.FC = () => {
 
   const handleToggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
+      document.documentElement.requestFullscreen()
+        .then(() => {
+          localStorage.setItem('lan_fullscreen', 'true');
+          localStorage.setItem('fullscreen_enabled', 'true');
+          setShowFsBanner(false);
+        })
+        .catch((err) => {
+          console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
+        localStorage.setItem('lan_fullscreen', 'false');
+        localStorage.setItem('fullscreen_enabled', 'false');
+        setShowFsBanner(false);
       }
     }
   };
@@ -362,218 +446,224 @@ const App: React.FC = () => {
       return (
         <div className="full-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px' }}>
           <div className="identity-panel">
-            <img src="/logo.png" alt="LAN Arcade Logo" className="identity-logo" style={{ width: 80, height: 80 }} />
-            <h1 className="identity-title">LAN ARCADE</h1>
-            <p className="identity-subtitle">Zero-latency local multiplayer gaming portal</p>
-
-            {/* Login Tabs Header */}
-            <div className="login-tabs-header" style={{
-              display: 'flex',
-              width: '100%',
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              borderRadius: '10px',
-              padding: '2px',
-              marginBottom: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.06)'
-            }}>
-              <button
-                type="button"
-                onClick={() => setLoginTab('create')}
-                className={`login-tab-btn ${loginTab === 'create' ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  background: loginTab === 'create' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                  border: loginTab === 'create' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
-                  color: loginTab === 'create' ? '#fff' : '#94a3b8',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '11px',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  transition: 'all 0.2s',
-                  boxShadow: loginTab === 'create' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none'
-                }}
-              >
-                Create Profile
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginTab('load')}
-                className={`login-tab-btn ${loginTab === 'load' ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  background: loginTab === 'load' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                  border: loginTab === 'load' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
-                  color: loginTab === 'load' ? '#fff' : '#94a3b8',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '11px',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  transition: 'all 0.2s',
-                  boxShadow: loginTab === 'load' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none'
-                }}
-              >
-                Reload Profile
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginTab('scan')}
-                className={`login-tab-btn ${loginTab === 'scan' ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  background: loginTab === 'scan' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-                  border: loginTab === 'scan' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
-                  color: loginTab === 'scan' ? '#fff' : '#94a3b8',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '11px',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                  transition: 'all 0.2s',
-                  boxShadow: loginTab === 'scan' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none'
-                }}
-              >
-                Scan QR
-              </button>
+            <div className="identity-brand-group">
+              <img src="/logo.png" alt="LAN Arcade Logo" className="identity-logo" style={{ width: 80, height: 80 }} />
+              <h1 className="identity-title">LAN ARCADE</h1>
+              <p className="identity-subtitle">Zero-latency local multiplayer gaming portal</p>
             </div>
 
-            {loginTab === 'create' && (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Username</label>
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={e => setNameInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleJoinPlatform()}
-                    placeholder="Enter username"
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.4)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '12px',
-                      color: '#fff',
-                      padding: '12px 16px',
-                      fontSize: '15px',
-                      fontWeight: 700,
-                      outline: 'none',
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Avatar Color</label>
-                  <div className="avatar-color-picker" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                    {['indigo', 'pink', 'emerald', 'amber', 'cyan', 'rose', 'violet'].map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setSelectedAvatar(c)}
-                        className={`avatar-color-circle ${selectedAvatar === c ? 'active' : ''}`}
-                        style={{
-                          backgroundColor: resolveAvatarColor(c),
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          border: selectedAvatar === c ? '2.5px solid #fff' : '2.5px solid transparent',
-                          cursor: 'pointer',
-                          boxShadow: selectedAvatar === c ? `0 0 12px ${resolveAvatarColor(c)}` : 'none',
-                          transition: 'all 0.2s'
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
+            <div className="identity-form-group">
+              {/* Login Tabs Header */}
+              <div className="login-tabs-header" style={{
+                display: 'flex',
+                width: '100%',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '10px',
+                padding: '2px',
+                marginBottom: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.06)'
+              }}>
                 <button
-                  onClick={handleJoinPlatform}
-                  className="primary-button"
+                  type="button"
+                  onClick={() => setLoginTab('create')}
+                  className={`login-tab-btn ${loginTab === 'create' ? 'active' : ''}`}
                   style={{
-                    background: 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    padding: '14px 20px',
+                    flex: 1,
+                    background: loginTab === 'create' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    border: loginTab === 'create' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
+                    color: loginTab === 'create' ? '#fff' : '#94a3b8',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
                     fontWeight: 900,
-                    fontSize: '14px',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                    marginTop: '8px',
-                    width: '100%',
                     textTransform: 'uppercase',
-                    letterSpacing: '1px'
+                    transition: 'all 0.2s',
+                    boxShadow: loginTab === 'create' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none'
                   }}
                 >
-                  Create Character
+                  Create Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginTab('load')}
+                  className={`login-tab-btn ${loginTab === 'load' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    background: loginTab === 'load' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    border: loginTab === 'load' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
+                    color: loginTab === 'load' ? '#fff' : '#94a3b8',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    transition: 'all 0.2s',
+                    boxShadow: loginTab === 'load' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none'
+                  }}
+                >
+                  Reload Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginTab('scan')}
+                  className={`login-tab-btn ${loginTab === 'scan' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    background: loginTab === 'scan' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                    border: loginTab === 'scan' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
+                    color: loginTab === 'scan' ? '#fff' : '#94a3b8',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    transition: 'all 0.2s',
+                    boxShadow: loginTab === 'scan' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'none'
+                  }}
+                >
+                  Scan QR
                 </button>
               </div>
-            )}
 
-            {loginTab === 'load' && (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Player ID</label>
-                  <input
-                    type="text"
-                    value={playerIdInput}
-                    onChange={e => setPlayerIdInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleJoinPlatform()}
-                    placeholder="Paste Player ID UUID"
+              {loginTab === 'create' && (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Username</label>
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleJoinPlatform()}
+                      placeholder="Enter username"
+                      className="identity-input"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '12px',
+                        color: '#fff',
+                        padding: '12px 16px',
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        outline: 'none',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Avatar Color</label>
+                    <div className="avatar-color-picker" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      {['indigo', 'pink', 'emerald', 'amber', 'cyan', 'rose', 'violet'].map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSelectedAvatar(c)}
+                          className={`avatar-color-circle ${selectedAvatar === c ? 'active' : ''}`}
+                          style={{
+                            backgroundColor: resolveAvatarColor(c),
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            border: selectedAvatar === c ? '2.5px solid #fff' : '2.5px solid transparent',
+                            cursor: 'pointer',
+                            boxShadow: selectedAvatar === c ? `0 0 12px ${resolveAvatarColor(c)}` : 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleJoinPlatform}
+                    className="primary-button identity-submit-btn"
                     style={{
-                      background: 'rgba(0, 0, 0, 0.4)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      background: 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '12px',
                       color: '#fff',
-                      padding: '12px 16px',
+                      padding: '14px 20px',
+                      fontWeight: 900,
                       fontSize: '14px',
-                      fontWeight: 700,
-                      outline: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                      marginTop: '8px',
                       width: '100%',
-                      boxSizing: 'border-box',
-                      fontFamily: 'monospace'
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px'
                     }}
-                  />
+                  >
+                    Create Character
+                  </button>
                 </div>
+              )}
 
-                <button
-                  onClick={handleJoinPlatform}
-                  className="primary-button"
-                  style={{
-                    background: 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    padding: '14px 20px',
-                    fontWeight: 900,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                    marginTop: '8px',
-                    width: '100%',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}
-                >
-                  Load Profile
-                </button>
-              </div>
-            )}
+              {loginTab === 'load' && (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Player ID</label>
+                    <input
+                      type="text"
+                      value={playerIdInput}
+                      onChange={e => setPlayerIdInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleJoinPlatform()}
+                      placeholder="Paste Player ID UUID"
+                      className="identity-input"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '12px',
+                        color: '#fff',
+                        padding: '12px 16px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        outline: 'none',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
 
-            {loginTab === 'scan' && (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Scan login QR code</label>
-                  <div className="qr-reader-container">
-                    <div id="qr-reader" />
+                  <button
+                    onClick={handleJoinPlatform}
+                    className="primary-button identity-submit-btn"
+                    style={{
+                      background: 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      padding: '14px 20px',
+                      fontWeight: 900,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                      marginTop: '8px',
+                      width: '100%',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px'
+                    }}
+                  >
+                    Load Profile
+                  </button>
+                </div>
+              )}
+
+              {loginTab === 'scan' && (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Scan login QR code</label>
+                    <div className="qr-reader-container">
+                      <div id="qr-reader" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       );
@@ -859,11 +949,15 @@ const App: React.FC = () => {
             <div className="dashboard-leave-section">
               <button
                 onClick={() => {
-                  if (window.confirm("Are you sure you want to leave the room?")) {
-                    wsClient.send('room.leave', {});
-                    window.history.replaceState({}, '', window.location.pathname);
-                    window.location.reload();
-                  }
+                  showConfirm(
+                    "LEAVE ROOM",
+                    "Are you sure you want to leave the room?",
+                    () => {
+                      wsClient.send('room.leave', {});
+                      clearRoomFromUrl();
+                      window.location.reload();
+                    }
+                  );
                 }}
                 className="lobby-btn-leave-new"
               >
@@ -1308,10 +1402,14 @@ const App: React.FC = () => {
 
                     <button 
                       onClick={() => {
-                        if (window.confirm("Are you sure you want to log out? This clears local session keys.")) {
-                          localStorage.clear();
-                          window.location.reload();
-                        }
+                        showConfirm(
+                          "LOGOUT",
+                          "Are you sure you want to log out? This clears local session keys.",
+                          () => {
+                            localStorage.clear();
+                            window.location.reload();
+                          }
+                        );
                       }} 
                       type="button"
                       style={{
@@ -1420,15 +1518,19 @@ const App: React.FC = () => {
 
                       <div className="pane-control-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.05)', padding: '10px 14px', borderRadius: 12, border: '1px dashed rgba(239,68,68,0.3)' }}>
                         <div className="pane-control-label">
-                          <strong style={{ fontSize: 13, color: '#ef4444' }}>Factory Reset</strong>
-                          <p style={{ margin: 0, fontSize: 10, color: 'rgba(239,68,68,0.7)' }}>Clear cached profile, stats and logout</p>
+                          <strong style={{ fontSize: 13, color: '#ef4444' }}>Logout</strong>
+                          <p style={{ margin: 0, fontSize: 10, color: 'rgba(239,68,68,0.7)' }}>Sign out of your profile and clear local cache</p>
                         </div>
                         <button
                           onClick={() => {
-                            if (window.confirm("This will erase your saved name, avatar choices, and stats. Proceed?")) {
-                              localStorage.clear();
-                              window.location.reload();
-                            }
+                            showConfirm(
+                              "LOGOUT",
+                              "Are you sure you want to log out? This will erase your saved name, avatar selections, and local stats.",
+                              () => {
+                                localStorage.clear();
+                                window.location.reload();
+                              }
+                            );
                           }}
                           style={{
                             background: '#ef4444',
@@ -1441,7 +1543,7 @@ const App: React.FC = () => {
                             cursor: 'pointer'
                           }}
                         >
-                          RESET
+                          LOGOUT
                         </button>
                       </div>
                     </div>
@@ -1459,19 +1561,28 @@ const App: React.FC = () => {
     if (!isSettingsOpen) return null;
 
     const handleLeaveMatch = () => {
-      if (window.confirm("Are you sure you want to leave the active match? You can rejoin later.")) {
-        setIsViewingLobby(true);
-        localStorage.setItem('isViewingLobby', 'true');
-        setIsSettingsOpen(false);
-      }
+      showConfirm(
+        "RETURN TO LOBBY",
+        "Are you sure you want to leave the active match? You can rejoin later.",
+        () => {
+          setIsViewingLobby(true);
+          localStorage.setItem('isViewingLobby', 'true');
+          setIsSettingsOpen(false);
+          attemptFullscreen();
+        }
+      );
     };
 
     const handleLeaveRoomReal = () => {
-      if (window.confirm("Are you sure you want to leave the room?")) {
-        wsClient.send('room.leave', {});
-        window.history.replaceState({}, '', window.location.pathname);
-        window.location.reload();
-      }
+      showConfirm(
+        "LEAVE ROOM",
+        "Are you sure you want to leave the room?",
+        () => {
+          wsClient.send('room.leave', {});
+          clearRoomFromUrl();
+          window.location.reload();
+        }
+      );
     };
 
     const categoriesList = [
@@ -1718,20 +1829,24 @@ const App: React.FC = () => {
 
                   <div className="pane-control-card" style={{ marginTop: 'auto', border: '1px dashed rgba(239,68,68,0.3)', padding: 12, background: 'rgba(239,68,68,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div className="pane-control-label">
-                      <strong>Factory Reset</strong>
-                      <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>Clear profile data, cached matches, and logout</p>
+                      <strong>Logout</strong>
+                      <p style={{ margin: 0, fontSize: 11, color: '#94a3b8' }}>Sign out of your profile and clear local cache</p>
                     </div>
                     <button
                       onClick={() => {
-                        if (window.confirm("This will erase your saved name, avatar choices, and stats. Proceed?")) {
-                          localStorage.clear();
-                          window.location.reload();
-                        }
+                        showConfirm(
+                          "LOGOUT",
+                          "Are you sure you want to log out? This will erase your saved name, avatar selections, and local stats.",
+                          () => {
+                            localStorage.clear();
+                            window.location.reload();
+                          }
+                        );
                       }}
                       className="pane-button danger-btn"
                       style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontWeight: 850 }}
                     >
-                      RESET ALL
+                      LOGOUT
                     </button>
                   </div>
                 </div>
@@ -1938,10 +2053,14 @@ const App: React.FC = () => {
 
             <button 
               onClick={() => {
-                if (window.confirm("Are you sure you want to log out? This clears local session keys.")) {
-                  localStorage.clear();
-                  window.location.reload();
-                }
+                showConfirm(
+                  "LOGOUT",
+                  "Are you sure you want to log out? This clears local session keys.",
+                  () => {
+                    localStorage.clear();
+                    window.location.reload();
+                  }
+                );
               }} 
               type="button"
               style={{
@@ -1984,7 +2103,12 @@ const App: React.FC = () => {
               <h4 style={styles.errorAlertTitle}>SYSTEM ALERT</h4>
             </div>
             <p style={styles.errorAlertText}>{errorAlert}</p>
-            <button onClick={() => setErrorAlert(null)} style={styles.errorAlertBtn}>
+            <button onClick={() => {
+              if (errorAlert && errorAlert.toLowerCase().includes('room not found')) {
+                clearRoomFromUrl();
+              }
+              setErrorAlert(null);
+            }} style={styles.errorAlertBtn}>
               DISMISS
             </button>
           </div>
@@ -1993,6 +2117,47 @@ const App: React.FC = () => {
       {renderView()}
       {renderSettingsModal()}
       {renderProfileModal()}
+      {customConfirm && customConfirm.isOpen && (
+        <div className="custom-confirm-overlay" style={styles.confirmOverlay}>
+          <div className="custom-confirm-card" style={styles.confirmCard}>
+            <h3 className="custom-confirm-title" style={styles.confirmTitle}>
+              {customConfirm.title}
+            </h3>
+            <p className="custom-confirm-message" style={styles.confirmMessage}>
+              {customConfirm.message}
+            </p>
+            <div className="custom-confirm-actions" style={styles.confirmActions}>
+              <button
+                className="custom-confirm-btn-cancel"
+                onClick={() => setCustomConfirm(null)}
+                style={styles.confirmBtnCancel}
+              >
+                {customConfirm.cancelText || 'CANCEL'}
+              </button>
+              <button
+                className="custom-confirm-btn-confirm"
+                onClick={customConfirm.onConfirm}
+                style={styles.confirmBtnConfirm}
+              >
+                {customConfirm.confirmText || 'CONFIRM'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showFsBanner && (
+        <div className="fs-recovery-banner" style={styles.fsBanner}>
+          <span>Return to fullscreen?</span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button onClick={handleRestoreFullscreen} style={styles.fsBannerBtn}>
+              YES
+            </button>
+            <button onClick={handleDismissFsBanner} style={styles.fsBannerCloseBtn} title="Dismiss">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -2480,6 +2645,114 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'not-allowed',
     boxShadow: 'none',
     opacity: 0.6,
+  },
+  confirmOverlay: {
+    position: 'fixed' as const,
+    inset: 0,
+    backgroundColor: 'rgba(2, 6, 12, 0.9)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10000,
+    backdropFilter: 'blur(10px)',
+  },
+  confirmCard: {
+    backgroundColor: '#0f172a',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    borderRadius: 20,
+    padding: 24,
+    width: '90%',
+    maxWidth: 380,
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.1)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    textAlign: 'center' as const,
+  },
+  confirmTitle: {
+    margin: '0 0 12px 0',
+    color: '#fff',
+    fontWeight: 900,
+    fontSize: 16,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase' as const,
+  },
+  confirmMessage: {
+    color: '#94a3b8',
+    fontSize: 13,
+    lineHeight: 1.5,
+    margin: '0 0 24px 0',
+  },
+  confirmActions: {
+    display: 'flex',
+    gap: 12,
+  },
+  confirmBtnCancel: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    color: '#fff',
+    padding: '12px',
+    borderRadius: 10,
+    fontWeight: 800,
+    fontSize: 12,
+    cursor: 'pointer',
+    textTransform: 'uppercase' as const,
+  },
+  confirmBtnConfirm: {
+    flex: 1,
+    background: 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    color: '#fff',
+    padding: '12px',
+    borderRadius: 10,
+    fontWeight: 800,
+    fontSize: 12,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+    textTransform: 'uppercase' as const,
+  },
+  fsBanner: {
+    position: 'fixed' as const,
+    bottom: 24,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: '#0f172a',
+    border: '1px solid rgba(99, 102, 241, 0.3)',
+    borderRadius: 16,
+    padding: '12px 20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 20,
+    zIndex: 9999,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(99, 102, 241, 0.15)',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: "'Inter', sans-serif",
+  },
+  fsBannerBtn: {
+    backgroundColor: '#2563eb',
+    border: 'none',
+    color: '#fff',
+    padding: '8px 16px',
+    borderRadius: 10,
+    fontWeight: 900,
+    fontSize: 11,
+    cursor: 'pointer',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
+    boxShadow: '0 4px 12px rgba(37,99,235,0.2)',
+  },
+  fsBannerCloseBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#94a3b8',
+    cursor: 'pointer',
+    padding: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 };
 
