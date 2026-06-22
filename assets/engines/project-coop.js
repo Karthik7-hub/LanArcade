@@ -186,36 +186,28 @@ const engine = {
             entities.push({ id: 'spawn_floor', type: 'platform', x: 0, y: 550, w: 500, h: 50 });
             startX = 500;
 
-            // 2. Select modular segments based on difficulty
-            let numSegments = 1;
-            if (difficulty === 'medium') numSegments = 2;
-            else if (difficulty === 'hard') numSegments = 3;
-            else if (difficulty === 'insane') numSegments = 4;
+            // 2. Generate Objective Graph
+            const objectiveGraph = this.generateObjectiveGraph(pCount, difficulty);
 
-            const segmentTypes = ['gap_mp', 'switch_laser', 'push_block', 'stacking_wall'];
+            // 3. Build geometry from Graph
+            startX = this.buildGraphGeometry(objectiveGraph, startX, pCount, entities);
 
-            for (let i = 0; i < numSegments; i++) {
-                const seg = this.prng.choice(segmentTypes);
-                startX = this.buildSegment(seg, startX, pCount, entities);
-            }
-
-            // 3. Exit Area
+            // 4. Exit Area
             entities.push({ id: 'exit_floor', type: 'platform', x: startX, y: 550, w: 600, h: 50 });
-            entities.push({ id: 'key1', type: 'key', x: startX + 150, y: 460, active: true });
-            entities.push({ id: 'door1', type: 'door', x: startX + 400, y: 450, w: 64, h: 100, locked: true });
+            // The final goal door requires the graph's dependencies.
+            entities.push({ id: objectiveGraph.id, type: 'door', x: startX + 400, y: 450, w: 64, h: 100, locked: true });
 
-            // 4. Run solver validation pass
+            // 5. Run simplified validation pass
             if (this.verifyLevel(entities, pCount)) {
                 this.state.entities = entities;
                 success = true;
-                console.log("Procedural level generated successfully after " + (attempts + 1) + " attempts. Seed: " + seed);
+                console.log("Procedural level generated successfully. Seed: " + seed);
             } else {
                 attempts++;
-                console.log("Procedural level failed solver validation. Regenerating...");
             }
         }
 
-        // Ultimate fallback if solver is somehow too strict
+        // Ultimate fallback
         if (!success) {
             console.log("Procedural generation failed validation repeatedly. Loading safe fallback level.");
             this.state.entities = [
@@ -227,79 +219,260 @@ const engine = {
         }
     },
 
-    buildSegment: function(type, startX, pCount, entities) {
-        if (type === 'gap_mp') {
-            // Gap with moving platform
-            entities.push({ id: 'plat_' + startX + '_1', type: 'platform', x: startX, y: 550, w: 150, h: 50 });
+    getScaleCategory: function(pCount) {
+        if (pCount <= 2) return 'small';
+        if (pCount <= 4) return 'team';
+        if (pCount <= 6) return 'group';
+        return 'large';
+    },
+
+    generateObjectiveGraph: function(pCount, difficulty) {
+        const category = this.getScaleCategory(pCount);
+        let pool = [];
+        if (category === 'small') {
+            pool = ['stack_intro', 'gap_intro', 'block_intro', 'switch_intro'];
+        } else if (category === 'team') {
+            pool = ['stack_med', 'gap_med', 'block_med', 'switch_med'];
+        } else if (category === 'group') {
+            pool = ['split_routing', 'synchronized_gate'];
+        } else { // large
+            pool = ['parallel_lanes', 'multi_stage_gate'];
+        }
+        
+        let numReqs = 1;
+        if (difficulty === 'medium') numReqs = 2;
+        else if (difficulty === 'hard') numReqs = 3;
+        else if (difficulty === 'insane') numReqs = 4;
+        
+        const graph = {
+            id: 'door1',
+            type: 'door',
+            requires: []
+        };
+
+        for (let i = 0; i < numReqs; i++) {
+            let reqType = i === 0 ? 'key' : this.prng.choice(['key', 'switch']);
+            let req = {
+                type: reqType,
+                id: reqType + '_req_' + i,
+                acquired_via: this.prng.choice(pool)
+            };
+            graph.requires.push(req);
+        }
+
+        return graph;
+    },
+
+    buildGraphGeometry: function(graph, startX, pCount, entities) {
+        let currentX = startX;
+        
+        for (let i = 0; i < graph.requires.length; i++) {
+            let req = graph.requires[i];
+            
+            // Build the geometric puzzle challenge
+            let endX = this.buildBlueprintSegment(req.acquired_via, currentX, pCount, entities, i);
+            
+            // Place the objective reward at the end of the puzzle
+            let rewardX = endX - 150;
+            let rewardY = 460; 
+            
+            if (req.type === 'key') {
+                entities.push({ id: req.id, type: 'key', x: rewardX, y: rewardY, active: true });
+            } else if (req.type === 'switch') {
+                entities.push({ 
+                    id: req.id, type: 'switch', 
+                    x: rewardX, y: 535, w: 32, h: 15, pressed: false, targetId: graph.id,
+                    isTimed: true, duration: 15 
+                });
+            }
+            
+            currentX = endX;
+        }
+        
+        return currentX;
+    },
+
+    buildBlueprintSegment: function(type, startX, pCount, entities, segmentIndex) {
+        if (type === 'stack_intro') {
+            // 2 Players: Stacking Intro
+            entities.push({ id: 'fl_' + segmentIndex + '_1', type: 'platform', x: startX, y: 550, w: 250, h: 50 });
+            entities.push({ id: 'wall_' + segmentIndex, type: 'platform', x: startX + 250, y: 390, w: 40, h: 60 });
+            entities.push({ id: 'gate_' + segmentIndex, type: 'door', x: startX + 250, y: 450, w: 40, h: 100, locked: true });
+            entities.push({ id: 'sw_' + segmentIndex, type: 'switch', x: startX + 260, y: 375, w: 20, h: 15, pressed: false, targetId: 'gate_' + segmentIndex });
+            entities.push({ id: 'fl_' + segmentIndex + '_2', type: 'platform', x: startX + 290, y: 550, w: 310, h: 50 });
+            return startX + 600;
+        }
+        
+        if (type === 'gap_intro') {
+            // 2 Players: Gap Intro
+            entities.push({ id: 'fl_' + segmentIndex + '_1', type: 'platform', x: startX, y: 550, w: 150, h: 50 });
             entities.push({
-                id: 'mp_' + startX,
+                id: 'mp_' + segmentIndex,
                 type: 'platform',
                 x: startX + 180,
                 y: 480,
-                w: 120,
+                w: 100,
                 h: 20,
                 isMoving: true,
                 startX: startX + 180,
                 startY: 480,
-                endX: startX + 380,
+                endX: startX + 320,
                 endY: 480,
                 speed: 1.5,
                 dir: 1,
                 progress: 0
             });
-            entities.push({ id: 'plat_' + startX + '_2', type: 'platform', x: startX + 450, y: 550, w: 150, h: 50 });
-            return startX + 600;
-        } else if (type === 'switch_laser') {
-            // Laser wall that turns off when switch is stood on
-            entities.push({ id: 'plat_' + startX, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
-            entities.push({ id: 'laser_' + startX, type: 'laser', x: startX + 300, y: 250, w: 16, h: 300, active: true });
-            
-            // Dual switches: first switch before laser, second switch after laser (so player 1 can be let across, then let player 2 cross)
-            entities.push({ id: 'sw1_' + startX, type: 'switch', x: startX + 120, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + startX });
-            entities.push({ id: 'sw2_' + startX, type: 'switch', x: startX + 450, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + startX });
-            return startX + 600;
-        } else if (type === 'push_block') {
-            // Push block puzzle
-            entities.push({ id: 'plat_' + startX, type: 'platform', x: startX, y: 550, w: 700, h: 50 });
-            entities.push({ id: 'wall_' + startX, type: 'platform', x: startX + 450, y: 450, w: 40, h: 100 });
-            entities.push({ id: 'gate_' + startX, type: 'door', x: startX + 450, y: 350, w: 40, h: 100, locked: true });
-            
-            // Switch targets intermediate gate
-            entities.push({ id: 'sw_' + startX, type: 'switch', x: startX + 350, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_' + startX });
-            // Block must be pushed on top of switch
-            entities.push({ id: 'box_' + startX, type: 'block', x: startX + 150, y: 500, w: 64, h: 50, mass: Math.ceil(pCount * 0.5) });
-            return startX + 700;
-        } else if (type === 'stacking_wall') {
-            // Wall that requires stacking or coordination to climb
-            entities.push({ id: 'plat_' + startX, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
-            
-            const wallH = Math.min(220, 100 + (pCount - 1) * 30);
-            entities.push({ id: 'stackwall_' + startX, type: 'platform', x: startX + 300, y: 550 - wallH, w: 40, h: wallH });
-            entities.push({ id: 'stackgate_' + startX, type: 'door', x: startX + 300, y: 450 - wallH, w: 40, h: 100, locked: true });
-            
-            // Switch on the other side lowers gate
-            entities.push({ id: 'stacksw_' + startX, type: 'switch', x: startX + 450, y: 535, w: 32, h: 15, pressed: false, targetId: 'stackgate_' + startX });
+            entities.push({ id: 'fl_' + segmentIndex + '_2', type: 'platform', x: startX + 400, y: 550, w: 200, h: 50 });
             return startX + 600;
         }
+        
+        if (type === 'block_intro') {
+            // 2 Players: Push Block Intro
+            entities.push({ id: 'fl_' + segmentIndex, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'box_' + segmentIndex, type: 'block', x: startX + 150, y: 500, w: 64, h: 50, mass: 1 });
+            entities.push({ id: 'sw_' + segmentIndex, type: 'switch', x: startX + 350, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_' + segmentIndex });
+            entities.push({ id: 'gate_' + segmentIndex, type: 'door', x: startX + 450, y: 450, w: 40, h: 100, locked: true });
+            return startX + 600;
+        }
+        
+        if (type === 'switch_intro') {
+            // 2 Players: Switch Intro
+            entities.push({ id: 'fl_' + segmentIndex, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'laser_' + segmentIndex, type: 'laser', x: startX + 300, y: 250, w: 16, h: 300, active: true });
+            entities.push({ id: 'sw1_' + segmentIndex, type: 'switch', x: startX + 150, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex });
+            entities.push({ id: 'sw2_' + segmentIndex, type: 'switch', x: startX + 450, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex });
+            return startX + 600;
+        }
+        
+        if (type === 'stack_med') {
+            // 3-4 Players: Stacking Medium
+            const ledgeHeight = pCount === 4 ? 230 : 200;
+            const ledgeTop = 550 - ledgeHeight;
+            entities.push({ id: 'fl_' + segmentIndex + '_1', type: 'platform', x: startX, y: 550, w: 250, h: 50 });
+            entities.push({ id: 'wall_' + segmentIndex, type: 'platform', x: startX + 250, y: ledgeTop, w: 40, h: ledgeHeight - 100 });
+            entities.push({ id: 'gate_' + segmentIndex, type: 'door', x: startX + 250, y: 450, w: 40, h: 100, locked: true });
+            entities.push({ id: 'sw_' + segmentIndex, type: 'switch', x: startX + 260, y: ledgeTop - 15, w: 20, h: 15, pressed: false, targetId: 'gate_' + segmentIndex });
+            entities.push({ id: 'fl_' + segmentIndex + '_2', type: 'platform', x: startX + 290, y: 550, w: 310, h: 50 });
+            return startX + 600;
+        }
+        
+        if (type === 'gap_med') {
+            // 3-4 Players: Gap Medium
+            entities.push({ id: 'fl_' + segmentIndex + '_1', type: 'platform', x: startX, y: 550, w: 250, h: 50 });
+            entities.push({ id: 'laser_' + segmentIndex, type: 'laser', x: startX + 300, y: 250, w: 16, h: 300, active: true });
+            entities.push({ id: 'sw1_' + segmentIndex, type: 'switch', x: startX + 80, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex, isTimed: true, duration: 5 });
+            entities.push({ id: 'sw2_' + segmentIndex, type: 'switch', x: startX + 180, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex, isTimed: true, duration: 5 });
+            entities.push({ id: 'fl_' + segmentIndex + '_2', type: 'platform', x: startX + 350, y: 550, w: 250, h: 50 });
+            return startX + 600;
+        }
+        
+        if (type === 'block_med') {
+            // 3-4 Players: Push Block Medium
+            entities.push({ id: 'fl_' + segmentIndex, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'ledge_' + segmentIndex, type: 'platform', x: startX + 400, y: 430, w: 200, h: 20 });
+            entities.push({ id: 'gate_' + segmentIndex, type: 'door', x: startX + 500, y: 330, w: 40, h: 100, locked: true });
+            entities.push({ id: 'box_' + segmentIndex, type: 'block', x: startX + 150, y: 500, w: 64, h: 50, mass: Math.max(2, pCount - 1) });
+            entities.push({ id: 'sw_' + segmentIndex, type: 'switch', x: startX + 300, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_' + segmentIndex });
+            return startX + 600;
+        }
+        
+        if (type === 'switch_med') {
+            // 3-4 Players: AND Gate Switches
+            entities.push({ id: 'fl_' + segmentIndex, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'laser_' + segmentIndex, type: 'laser', x: startX + 400, y: 250, w: 16, h: 300, active: true });
+            entities.push({ id: 'sw1_' + segmentIndex, type: 'switch', x: startX + 100, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex, isTimed: true, duration: 5 });
+            entities.push({ id: 'sw2_' + segmentIndex, type: 'switch', x: startX + 200, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex, isTimed: true, duration: 5 });
+            entities.push({ id: 'sw3_' + segmentIndex, type: 'switch', x: startX + 300, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_' + segmentIndex, isTimed: true, duration: 5 });
+            return startX + 600;
+        }
+        
+        if (type === 'split_routing') {
+            // 5-6 Players: Split Routing (2 lanes)
+            entities.push({ id: 'step_' + segmentIndex, type: 'platform', x: startX, y: 450, w: 100, h: 20 });
+            entities.push({ id: 'fl_top_' + segmentIndex, type: 'platform', x: startX + 100, y: 350, w: 500, h: 20 });
+            entities.push({ id: 'fl_bot_' + segmentIndex, type: 'platform', x: startX + 100, y: 550, w: 500, h: 50 });
+            
+            entities.push({ id: 'gate_top_' + segmentIndex, type: 'door', x: startX + 400, y: 250, w: 40, h: 100, locked: true });
+            entities.push({ id: 'gate_bot_' + segmentIndex, type: 'door', x: startX + 400, y: 450, w: 40, h: 100, locked: true });
+            
+            entities.push({ id: 'sw_top_' + segmentIndex, type: 'switch', x: startX + 250, y: 335, w: 32, h: 15, pressed: false, targetId: 'gate_bot_' + segmentIndex });
+            entities.push({ id: 'sw_bot_' + segmentIndex, type: 'switch', x: startX + 250, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_top_' + segmentIndex });
+            
+            entities.push({ id: 'sw_top_right_' + segmentIndex, type: 'switch', x: startX + 460, y: 335, w: 32, h: 15, pressed: false, targetId: 'gate_bot_' + segmentIndex });
+            entities.push({ id: 'sw_bot_right_' + segmentIndex, type: 'switch', x: startX + 460, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_top_' + segmentIndex });
+            
+            return startX + 600;
+        }
+        
+        if (type === 'synchronized_gate') {
+            // 5-6 Players: Synchronized Timed Switch Network
+            entities.push({ id: 'fl_' + segmentIndex, type: 'platform', x: startX, y: 550, w: 600, h: 50 });
+            entities.push({ id: 'obs_' + segmentIndex, type: 'platform', x: startX + 220, y: 480, w: 50, h: 70 });
+            entities.push({ id: 'gate_' + segmentIndex, type: 'door', x: startX + 450, y: 450, w: 40, h: 100, locked: true });
+            entities.push({ id: 'sw1_' + segmentIndex, type: 'switch', x: startX + 100, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_' + segmentIndex, isTimed: true, duration: 4 });
+            entities.push({ id: 'sw2_' + segmentIndex, type: 'switch', x: startX + 300, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate_' + segmentIndex, isTimed: true, duration: 4 });
+            return startX + 600;
+        }
+        
+        if (type === 'parallel_lanes') {
+            // 7-8 Players: Parallel Lanes (3 lanes, split coordination, multi-key collection)
+            entities.push({ id: 'step_mid_' + segmentIndex, type: 'platform', x: startX, y: 450, w: 80, h: 20 });
+            entities.push({ id: 'step_top_' + segmentIndex, type: 'platform', x: startX + 80, y: 250, w: 80, h: 20 });
+            
+            entities.push({ id: 'fl_top_' + segmentIndex, type: 'platform', x: startX + 160, y: 150, w: 640, h: 20 });
+            entities.push({ id: 'fl_mid_' + segmentIndex, type: 'platform', x: startX + 160, y: 350, w: 640, h: 20 });
+            entities.push({ id: 'fl_bot_' + segmentIndex, type: 'platform', x: startX + 160, y: 550, w: 640, h: 50 });
+            
+            entities.push({ id: 'key_top_' + segmentIndex, type: 'key', x: startX + 400, y: 110, active: true });
+            entities.push({ id: 'key_mid_' + segmentIndex, type: 'key', x: startX + 450, y: 310, active: true });
+            entities.push({ id: 'key_bot_' + segmentIndex, type: 'key', x: startX + 500, y: 510, active: true });
+            
+            entities.push({ id: 'laser_top_' + segmentIndex, type: 'laser', x: startX + 300, y: 50, w: 16, h: 100, active: true });
+            entities.push({ id: 'laser_mid_' + segmentIndex, type: 'laser', x: startX + 350, y: 250, w: 16, h: 100, active: true });
+            entities.push({ id: 'laser_bot_' + segmentIndex, type: 'laser', x: startX + 300, y: 450, w: 16, h: 100, active: true });
+            
+            entities.push({ id: 'sw_top_' + segmentIndex, type: 'switch', x: startX + 220, y: 135, w: 32, h: 15, pressed: false, targetId: 'laser_mid_' + segmentIndex, isTimed: true, duration: 8 });
+            entities.push({ id: 'sw_mid_' + segmentIndex, type: 'switch', x: startX + 220, y: 335, w: 32, h: 15, pressed: false, targetId: 'laser_bot_' + segmentIndex, isTimed: true, duration: 8 });
+            entities.push({ id: 'sw_bot_' + segmentIndex, type: 'switch', x: startX + 220, y: 535, w: 32, h: 15, pressed: false, targetId: 'laser_top_' + segmentIndex, isTimed: true, duration: 8 });
+            
+            return startX + 800;
+        }
+        
+        if (type === 'multi_stage_gate') {
+            // 7-8 Players: Multi-stage sequential timed relays
+            entities.push({ id: 'fl_' + segmentIndex, type: 'platform', x: startX, y: 550, w: 800, h: 50 });
+            
+            entities.push({ id: 'gate1_' + segmentIndex, type: 'door', x: startX + 250, y: 450, w: 40, h: 100, locked: true });
+            entities.push({ id: 'gate2_' + segmentIndex, type: 'door', x: startX + 500, y: 450, w: 40, h: 100, locked: true });
+            
+            entities.push({ id: 'sw1_' + segmentIndex, type: 'switch', x: startX + 150, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate1_' + segmentIndex, isTimed: true, duration: 6 });
+            entities.push({ id: 'sw2_' + segmentIndex, type: 'switch', x: startX + 380, y: 535, w: 32, h: 15, pressed: false, targetId: 'gate2_' + segmentIndex, isTimed: true, duration: 6 });
+            
+            return startX + 800;
+        }
+        
         return startX + 500;
     },
 
     verifyLevel: function(entities, pCount) {
-        // Logical verification solver pass
-        // Ensure that platforms and gaps are jumpable
-        // and that switches are placed logically.
-        
         let door = entities.find(e => e.id === 'door1');
-        let key = entities.find(e => e.id === 'key1');
-        if (!door || !key) return false;
+        if (!door) return false;
 
-        // Verify that players can cross all components
-        // A segment is valid if any gates/lasers can be unlocked by switches that players can reach.
-        // For linear placement, as long as intermediate gates are unlocked by switches reachable before them, it is solvable.
-        // Special case: Stacking Wall has switch *after* wall, which is solvable if player count >= 2 (allows stacking to climb over).
-        const stackingWalls = entities.filter(e => e.id && e.id.startsWith('stackwall_'));
-        for (let wall of stackingWalls) {
-            if (pCount < 2) return false; // Stacking walls require at least 2 players
+        const blocks = entities.filter(e => e.type === 'block');
+        for (let b of blocks) {
+            if (b.mass > pCount) return false;
+        }
+
+        for (let ent of entities) {
+            if (ent.id && ent.id.startsWith('wall_')) {
+                const heightDiff = 550 - ent.y;
+                if (heightDiff > 140) {
+                    const reqPlayers = Math.ceil((heightDiff - 140) / 32) + 1;
+                    if (pCount < reqPlayers) {
+                        return false;
+                    }
+                }
+            }
         }
 
         return true;
@@ -329,7 +502,7 @@ const engine = {
         for (let step = 0; step < steps; step++) {
             this.state.tick++;
             this.updateEntities(subDt);
-            this.updateSwitches();
+            this.updateSwitches(subDt);
 
             for (let id in this.state.players) {
                 const p = this.state.players[id];
@@ -453,8 +626,8 @@ const engine = {
         });
     },
 
-    updateSwitches: function() {
-        // Reset all intermediate doors to locked and active lasers to true
+    updateSwitches: function(dt) {
+        // Reset intermediate doors and lasers to default restrictive state
         this.state.entities.forEach(e => {
             if (e.type === 'laser') e.active = true;
             if (e.type === 'door' && e.id !== 'door1') e.locked = true;
@@ -465,7 +638,6 @@ const engine = {
         switches.forEach(sw => {
             let pressed = false;
             
-            // Check player overlap
             for (let id in this.state.players) {
                 const p = this.state.players[id];
                 if (!p.isDead && this.checkOverlap({ left: p.x, right: p.x + 32, top: p.y, bottom: p.y + 32 }, sw)) {
@@ -474,7 +646,6 @@ const engine = {
                 }
             }
             
-            // Check block overlap
             const blocks = this.state.entities.filter(e => e.type === 'block');
             for (let b of blocks) {
                 if (this.checkOverlap({ left: b.x, right: b.x + b.w, top: b.y, bottom: b.y + b.h }, sw)) {
@@ -483,16 +654,38 @@ const engine = {
                 }
             }
 
-            sw.pressed = pressed;
+            if (sw.isTimed) {
+                if (pressed) {
+                    sw.timerRemaining = sw.duration || 5;
+                    sw.pressed = true;
+                } else {
+                    if (typeof sw.timerRemaining !== 'number') sw.timerRemaining = 0;
+                    sw.timerRemaining = Math.max(0, sw.timerRemaining - (dt || 0.016));
+                    sw.pressed = sw.timerRemaining > 0;
+                }
+            } else {
+                sw.pressed = pressed;
+            }
+        });
 
-            // Trigger target entity state
-            if (pressed) {
-                const target = this.state.entities.find(e => e.id === sw.targetId);
-                if (target) {
-                    if (target.type === 'laser') {
-                        target.active = false;
-                    } else if (target.type === 'door') {
-                        target.locked = false;
+        // Evaluate target states
+        const activeKeys = this.state.entities.filter(ent => ent.type === 'key' && ent.active);
+        const keysExist = this.state.entities.some(ent => ent.type === 'key');
+        const keyLocked = keysExist && activeKeys.length > 0;
+
+        const targets = this.state.entities.filter(e => e.type === 'laser' || e.type === 'door');
+        targets.forEach(target => {
+            const targetingSwitches = switches.filter(sw => sw.targetId === target.id);
+            
+            if (target.id === 'door1') {
+                const switchLocked = targetingSwitches.length > 0 ? !targetingSwitches.every(sw => sw.pressed) : false;
+                target.locked = keyLocked || switchLocked;
+            } else {
+                if (targetingSwitches.length > 0) {
+                    const allPressed = targetingSwitches.every(sw => sw.pressed);
+                    if (allPressed) {
+                        if (target.type === 'laser') target.active = false;
+                        else if (target.type === 'door') target.locked = false;
                     }
                 }
             }
@@ -522,9 +715,8 @@ const engine = {
             }
             if (e.type === 'key' && e.active && this.checkOverlap(bounds, { ...e, w: 32, h: 32 })) {
                 e.active = false;
-                const door = this.state.entities.find(ent => ent.id === 'door1');
-                if (door) door.locked = false;
-                console.log("Key collected! Exit door unlocked.");
+                const activeKeys = this.state.entities.filter(ent => ent.type === 'key' && ent.active);
+                console.log("Key collected! Remaining active keys: " + activeKeys.length);
             }
         });
 

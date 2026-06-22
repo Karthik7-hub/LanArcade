@@ -3,6 +3,10 @@ export interface Player {
   name: string;
   avatar: string;
   isHost: boolean;
+  stats?: {
+    totalWins: number;
+    gameWins: Record<string, number>;
+  };
 }
 
 export interface GameManifest {
@@ -17,6 +21,7 @@ export interface GameManifest {
   maxPlayers: number;
   thumbnail?: string;
   settingsSchema?: Record<string, any>;
+  description?: string;
 }
 
 export type RoomStatus = 'waiting' | 'active' | 'finished';

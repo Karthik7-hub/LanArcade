@@ -27,12 +27,19 @@ class ConnectionManager {
 
   int get activeCount => _connections.length;
 
+  /// Only counts connections that have completed player.identify
+  int get identifiedCount => _connections.values.where((c) => c.player != null).length;
+
   int getActiveConnectionsCount(String roomId) {
     return _connections.values.where((conn) => conn.roomId == roomId).length;
   }
 
   bool isPlayerOnline(String playerId, String roomId) {
     return _connections.values.any((conn) => conn.player?.id == playerId && conn.roomId == roomId);
+  }
+
+  bool isPlayerOnlineGlobally(String playerId, String currentConnectionId) {
+    return _connections.values.any((conn) => conn.player?.id == playerId && conn.id != currentConnectionId);
   }
 
 

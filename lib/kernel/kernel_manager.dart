@@ -49,6 +49,10 @@ class KernelManager {
 
   List<GameManifest> get availableGames => _runtime?.pluginManager.availableGames ?? [];
 
+  int get activeRoomsCount => _runtime?.roomData.length ?? 0;
+
+  Map<String, Room> get activeRooms => _runtime?.roomData ?? {};
+
   Future<void> start() async {
     if (_runtime?.isRunning == true) return;
 

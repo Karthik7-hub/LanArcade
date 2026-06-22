@@ -1,5 +1,6 @@
 import { useStore } from './store';
 import { PlatformEvent } from '../shared/types';
+import { IdentityManager } from './IdentityManager';
 
 class WebSocketClient {
   private socket: WebSocket | null = null;
@@ -98,6 +99,7 @@ class WebSocketClient {
         break;
       case 'player.identified':
         store.setPlayer(event.payload);
+        IdentityManager.savePlayer(event.payload);
         const params = new URLSearchParams(window.location.search);
         const roomCode = params.get('room');
         if (roomCode) {

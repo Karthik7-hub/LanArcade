@@ -15,8 +15,76 @@ class ArcadeTheme {
       scaffoldBackgroundColor: backgroundColor,
       cardTheme: CardThemeData(
         color: surfaceColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surfaceColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.white10, width: 1),
+        ),
+        titleTextStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+        contentTextStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 14,
+          color: Colors.white70,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.black.withValues(alpha: 0.2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white10),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white10),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primaryColor, width: 1.5),
+        ),
+        labelStyle: GoogleFonts.plusJakartaSans(color: Colors.white60),
+        hintStyle: GoogleFonts.plusJakartaSans(color: Colors.white30),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.white60,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Colors.white10,
+        thickness: 1,
+        space: 24,
       ),
       textTheme: GoogleFonts.plusJakartaSansTextTheme(
         ThemeData.dark().textTheme.apply(bodyColor: Colors.white, displayColor: Colors.white),

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:logging/logging.dart';
@@ -22,7 +23,7 @@ class AssetExtractor {
     }
 
     final versionFile = File(p.join(targetDir.path, 'version.txt'));
-    if (await versionFile.exists()) {
+    if (!kDebugMode && await versionFile.exists()) {
       final currentVersion = await versionFile.readAsString();
       if (currentVersion.trim() == _version) {
         _log.info('Shell assets already up-to-date at version $_version. Skipping extraction.');
@@ -67,7 +68,7 @@ class AssetExtractor {
     }
 
     final versionFile = File(p.join(targetDir.path, 'version.txt'));
-    if (await versionFile.exists()) {
+    if (!kDebugMode && await versionFile.exists()) {
       final currentVersion = await versionFile.readAsString();
       if (currentVersion.trim() == _version) {
         _log.info('Game assets for $gameId already up-to-date at version $_version. Skipping extraction.');

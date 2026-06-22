@@ -34,6 +34,7 @@ GameManifest _$GameManifestFromJson(Map<String, dynamic> json) => GameManifest(
   maxPlayers: (json['maxPlayers'] as num).toInt(),
   thumbnail: json['thumbnail'] as String?,
   settingsSchema: json['settingsSchema'] as Map<String, dynamic>?,
+  description: json['description'] as String?,
 );
 
 Map<String, dynamic> _$GameManifestToJson(GameManifest instance) =>
@@ -49,6 +50,7 @@ Map<String, dynamic> _$GameManifestToJson(GameManifest instance) =>
       'maxPlayers': instance.maxPlayers,
       'thumbnail': instance.thumbnail,
       'settingsSchema': instance.settingsSchema,
+      'description': instance.description,
     };
 
 Room _$RoomFromJson(Map<String, dynamic> json) => Room(

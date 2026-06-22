@@ -280,9 +280,14 @@ const engine = {
 
     handleTimeout: function() {
         const currentId = this.state.playerIds[this.state.currentPlayerIndex];
-        // Timeout: draw one card and pass turn
+        // Timeout: draw penalty cards if any are pending, otherwise draw one card
         console.log("Auto-drawing card due to timeout for " + currentId);
-        this.drawOne(currentId);
+        if (this.state.drawPending > 0) {
+            this.applyPenalty(currentId, this.state.drawPending);
+            this.state.drawPending = 0;
+        } else {
+            this.drawOne(currentId);
+        }
         this.advanceTurn(1);
         this.resetTurnTimer();
         this.sync();
@@ -315,13 +320,13 @@ const engine = {
                 console.log("Draw penalty pending, stacking is disabled. Must draw.");
                 return;
             }
-            // Can stack DrawTwo on DrawTwo, or WildDrawFour on WildDrawFour, or WildDrawFour on DrawTwo (but not vice versa)
-            const matchesPenalty = (card.value === 'DrawTwo' && this.state.currentValue === 'DrawTwo') ||
-                                   (card.value === 'WildDrawFour');
+            // Can stack any DrawTwo or WildDrawFour on top of a pending draw penalty
+            const matchesPenalty = card.value === 'DrawTwo' || card.value === 'WildDrawFour';
             if (!matchesPenalty) {
                 console.log("Cannot stack " + card.value + " on " + this.state.currentValue + ". Must stack penalty or draw.");
                 return;
             }
+            isMatch = true; // Bypass normal color/value match check since stack is valid
         }
 
         if (!isMatch) {

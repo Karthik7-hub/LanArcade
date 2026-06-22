@@ -47,6 +47,7 @@ class GameManifest {
   final int maxPlayers;
   final String? thumbnail;
   final Map<String, dynamic>? settingsSchema;
+  final String? description;
 
   GameManifest({
     required this.id,
@@ -60,6 +61,7 @@ class GameManifest {
     required this.maxPlayers,
     this.thumbnail,
     this.settingsSchema,
+    this.description,
   });
 
   factory GameManifest.fromJson(Map<String, dynamic> json) => _$GameManifestFromJson(json);

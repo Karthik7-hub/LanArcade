@@ -19,7 +19,11 @@ class DiscoveryService {
 
   Future<void> stop() async {
     if (_registration != null) {
-      await unregister(_registration!);
+      try {
+        await unregister(_registration!);
+      } catch (e) {
+        // MDNS stack unregistration occasionally throws; swallow it to avoid hanging shutdown
+      }
       _registration = null;
     }
   }

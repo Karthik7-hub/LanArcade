@@ -860,10 +860,8 @@
                 if (!publicState.settings || !publicState.settings.stacking) {
                     return false; // Stacking disabled, must draw penalty
                 }
-                // If stacking is enabled:
-                // DrawTwo on DrawTwo, or WildDrawFour on WildDrawFour, or WildDrawFour on DrawTwo
-                return (card.value === 'DrawTwo' && publicState.currentValue === 'DrawTwo') ||
-                       (card.value === 'WildDrawFour');
+                // If stacking is enabled, any DrawTwo or WildDrawFour can stack on any pending penalty
+                return card.value === 'DrawTwo' || card.value === 'WildDrawFour';
             }
 
             // Normal match logic
@@ -1669,6 +1667,31 @@
                     `;
                 }).join('');
             }
+
+            // Render local avatar's spinner, circle, and badge count/placement
+            const localPlacementIdx = finishedPlayers.indexOf(player.id);
+            const localPlacementText = localPlacementIdx !== -1 ? `${localPlacementIdx + 1}${getOrdinal(localPlacementIdx + 1)}` : '';
+            const localBadgeCount = hand.length;
+
+            let localBadgeHTML = '';
+            if (isLocalFinished) {
+                localBadgeHTML = `<span style="color:#fbbf24; font-weight:bold; font-size:10px;">🏆 ${localPlacementText}</span>`;
+            } else {
+                localBadgeHTML = `
+                    <div class="badge-icon"></div>
+                    <span style="color:white; font-weight:bold;">${localBadgeCount}</span>
+                `;
+            }
+
+            DOM.localAvatar.innerHTML = `
+                <div style="position:relative">
+                    <div class="avatar-spinner"></div>
+                    <div class="avatar-circle">YOU</div>
+                    <div class="avatar-badge" style="display:flex; align-items:center; justify-content:center;">
+                        ${localBadgeHTML}
+                    </div>
+                </div>
+            `;
 
             if (isMyTurn) DOM.localAvatar.classList.add('active');
             else DOM.localAvatar.classList.remove('active');

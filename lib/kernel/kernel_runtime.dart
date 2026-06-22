@@ -84,6 +84,35 @@ class KernelRuntime {
           headers: {'content-type': 'application/json'});
     });
 
+    // API: List all registered players with stats
+    router.get('/api/players', (Request request) async {
+      final players = await db.select(db.players).get();
+      final result = <Map<String, dynamic>>[];
+      for (final p in players) {
+        final statsList = await (db.select(db.gameStats)..where((t) => t.playerId.equals(p.id))).get();
+        int totalWins = 0;
+        final gameWins = <String, int>{};
+        for (var stat in statsList) {
+          totalWins += stat.wins;
+          gameWins[stat.gameId] = stat.wins;
+        }
+        result.add({
+          'id': p.id,
+          'name': p.name,
+          'avatar': p.avatar,
+          'lastSeen': p.lastSeen.toIso8601String(),
+          'stats': {'totalWins': totalWins, 'gameWins': gameWins},
+        });
+      }
+      return Response.ok(
+        jsonEncode(result),
+        headers: {
+          'content-type': 'application/json',
+          'access-control-allow-origin': '*',
+        },
+      );
+    });
+
     // API: List achievements of a player
     router.get('/api/players/<playerId>/achievements', (Request request, String playerId) async {
       final query = db.select(db.achievements)..where((t) => t.playerId.equals(playerId));
@@ -146,7 +175,7 @@ class KernelRuntime {
 
       _statsController.add({
         'log': 'WS_CONNECTION: $connectionId',
-        'activeConnections': connectionManager.activeCount,
+        'activeConnections': connectionManager.identifiedCount, // only identified players
       });
 
       channel.stream.listen(
@@ -210,25 +239,49 @@ class KernelRuntime {
   Future<void> stop() async {
     // Dispose all game engines
     for (final engine in activeEngines.values) {
-      engine.dispose();
+      try {
+        engine.dispose();
+      } catch (e) {
+        _log.warning('Error disposing engine: $e');
+      }
     }
     activeEngines.clear();
     roomData.clear();
 
     // Cancel all cleanup timers
     for (final timer in _cleanupTimers.values) {
-      timer.cancel();
+      try {
+        timer.cancel();
+      } catch (e) {
+        _log.warning('Error cancelling timer: $e');
+      }
     }
     _cleanupTimers.clear();
 
     // Close all active connections
-    connectionManager.closeAll();
+    try {
+      connectionManager.closeAll();
+    } catch (e) {
+      _log.warning('Error closing connections: $e');
+    }
+
+    // Close HTTP Server first so it stops accepting requests
+    try {
+      if (_server != null) {
+        await _server!.close(force: true);
+        _server = null;
+      }
+    } catch (e) {
+      _log.warning('Error closing HTTP server: $e');
+    }
 
     // Close the database to prevent SQLite file descriptor leak
-    await db.close();
+    try {
+      await db.close();
+    } catch (e) {
+      _log.warning('Error closing database: $e');
+    }
 
-    await _server?.close(force: true);
-    _server = null;
     _isRunning = false;
     _statsController.add({'status': 'stopped', 'log': 'SERVER_STOPPED'});
   }
@@ -246,15 +299,67 @@ class KernelRuntime {
         break;
 
       case 'player.identify':
+        final String playerId = payload['id'] ?? '';
+        if (playerId.isNotEmpty && connectionManager.isPlayerOnlineGlobally(playerId, connectionId)) {
+          connection.send('system.error', 'This Player ID is already active on another device.');
+          return;
+        }
+
+        String? name = payload['name'];
+        String avatar = payload['avatar'] ?? 'default';
+
+        if (name == null || name.trim().isEmpty) {
+          if (playerId.isEmpty) {
+            connection.send('system.error', 'Username is required.');
+            return;
+          }
+          final dbPlayer = await (db.select(db.players)..where((t) => t.id.equals(playerId))).getSingleOrNull();
+          if (dbPlayer == null) {
+            connection.send('system.error', 'No profile found for this Player ID.');
+            return;
+          }
+          name = dbPlayer.name;
+          avatar = dbPlayer.avatar;
+        }
+
+        final resolvedPlayerId = playerId.isEmpty ? _uuid.v4() : playerId;
+
+        await db.into(db.players).insertOnConflictUpdate(PlayersCompanion.insert(
+          id: resolvedPlayerId,
+          name: name,
+          avatar: avatar,
+          lastSeen: DateTime.now(),
+        ));
+
         final player = models.Player(
-          id: payload['id'] ?? _uuid.v4(),
-          name: payload['name'],
-          avatar: payload['avatar'] ?? 'default',
+          id: resolvedPlayerId,
+          name: name,
+          avatar: avatar,
         );
         connection.player = player;
         connectionManager.removeStaleConnections(player.id, connectionId);
-        connection.send('player.identified', player.toJson());
+
+        // Fetch global wins for this player
+        final statsList = await (db.select(db.gameStats)..where((t) => t.playerId.equals(player.id))).get();
+        int totalWins = 0;
+        final gameWins = <String, int>{};
+        for (var stat in statsList) {
+          totalWins += stat.wins;
+          gameWins[stat.gameId] = stat.wins;
+        }
+        final statsPayload = {
+          'totalWins': totalWins,
+          'gameWins': gameWins,
+        };
+
+        final playerJson = Map<String, dynamic>.from(player.toJson());
+        playerJson['stats'] = statsPayload;
+
+        connection.send('player.identified', playerJson);
         logSystemEvent('PLAYER_IDENTIFIED: connectionId=$connectionId, player=${player.name} (${player.id})');
+        // Update admin dashboard player count to only show identified players
+        _statsController.add({'activeConnections': connectionManager.identifiedCount});
+
 
         if (connection.roomId != null) {
           final roomId = connection.roomId!;
@@ -541,37 +646,7 @@ class KernelRuntime {
                   final oldState = currentRoom.publicGameState;
                   final wasFinished = oldState != null && oldState['status'] == 'finished';
                   if (!wasFinished) {
-                    final settings = Map<String, dynamic>.from(currentRoom.settings);
-                    final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
-                    
-                    // Find winner name
-                    final winnerPlayer = currentRoom.players.firstWhere(
-                      (p) => p.id == winnerId,
-                      orElse: () => models.Player(id: winnerId, name: 'Unknown', avatar: 'default'),
-                    );
-                    
-                    final currentWins = leaderboard[winnerId] is Map
-                        ? (leaderboard[winnerId]['wins'] ?? 0)
-                        : (leaderboard[winnerId] ?? 0);
-                        
-                    leaderboard[winnerId] = {
-                      'name': winnerPlayer.name,
-                      'wins': currentWins + 1,
-                    };
-                    settings['_leaderboard'] = leaderboard;
-                    
-                    // Save to DB and broadcast room.update
-                    roomService.updateSettings(room.id, settings);
-                    
-                    // Create updated room with settings and final state
-                    final updatedRoom = currentRoom.copyWith(
-                      settings: settings,
-                      publicGameState: finalState,
-                    );
-                    roomData[room.id] = updatedRoom;
-                    connectionManager.broadcastToRoom(room.id, 'room.update', updatedRoom.toJson());
-                    roomService.updatePublicState(room.id, finalState);
-                    connectionManager.broadcastToRoom(room.id, 'game.public_state', finalState);
+                    _handleGameFinished(currentRoom, finalState, winnerId);
                     return;
                   }
                 }
@@ -646,37 +721,7 @@ class KernelRuntime {
                   final oldState = currentRoom.publicGameState;
                   final wasFinished = oldState != null && oldState['status'] == 'finished';
                   if (!wasFinished) {
-                    final settings = Map<String, dynamic>.from(currentRoom.settings);
-                    final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
-                    
-                    // Find winner name
-                    final winnerPlayer = currentRoom.players.firstWhere(
-                      (p) => p.id == winnerId,
-                      orElse: () => models.Player(id: winnerId, name: 'Unknown', avatar: 'default'),
-                    );
-                    
-                    final currentWins = leaderboard[winnerId] is Map
-                        ? (leaderboard[winnerId]['wins'] ?? 0)
-                        : (leaderboard[winnerId] ?? 0);
-                        
-                    leaderboard[winnerId] = {
-                      'name': winnerPlayer.name,
-                      'wins': currentWins + 1,
-                    };
-                    settings['_leaderboard'] = leaderboard;
-                    
-                    // Save to DB and broadcast room.update
-                    roomService.updateSettings(room.id, settings);
-                    
-                    // Create updated room with settings and final state
-                    final updatedRoom = currentRoom.copyWith(
-                      settings: settings,
-                      publicGameState: finalState,
-                    );
-                    roomData[room.id] = updatedRoom;
-                    connectionManager.broadcastToRoom(room.id, 'room.update', updatedRoom.toJson());
-                    roomService.updatePublicState(room.id, finalState);
-                    connectionManager.broadcastToRoom(room.id, 'game.public_state', finalState);
+                    _handleGameFinished(currentRoom, finalState, winnerId);
                     return;
                   }
                 }
@@ -940,6 +985,46 @@ class KernelRuntime {
         updatedRoom = updatedRoom.copyWith(hostId: newHost.id);
         await roomService.updateHost(roomId, newHost.id);
       }
+
+      if (room.status == models.RoomStatus.active && room.players.length == 1) {
+        final remainingPlayer = room.players.first;
+        final settings = Map<String, dynamic>.from(room.settings);
+        final winOnAbandonment = settings['winOnAbandonment'] ?? true;
+        
+        if (winOnAbandonment) {
+          final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
+          
+          final currentWins = leaderboard[remainingPlayer.id] is Map
+              ? (leaderboard[remainingPlayer.id]['wins'] ?? 0)
+              : (leaderboard[remainingPlayer.id] ?? 0);
+              
+          leaderboard[remainingPlayer.id] = {
+            'name': remainingPlayer.name,
+            'wins': currentWins + 1,
+          };
+          settings['_leaderboard'] = leaderboard;
+          
+          final activeEngine = activeEngines.remove(roomId);
+          activeEngine?.dispose();
+          
+          updatedRoom = updatedRoom.copyWith(
+            status: models.RoomStatus.waiting,
+            settings: settings,
+            publicGameState: null,
+          );
+          
+          await roomService.updateSettings(roomId, settings);
+          await roomService.updateStatus(roomId, models.RoomStatus.waiting);
+          await roomService.updatePublicState(roomId, {});
+          logSystemEvent('SINGLE_PLAYER_LEFT: Only ${remainingPlayer.name} is left. Awarded win. Room returned to lobby.');
+
+          // Record win globally in DB
+          _recordPlayerWin(room.game.id, remainingPlayer.id, remainingPlayer.name);
+        } else {
+          logSystemEvent('SINGLE_PLAYER_LEFT: Only ${remainingPlayer.name} is left, but winOnAbandonment is disabled.');
+        }
+      }
+
       roomData[roomId] = updatedRoom;
       await roomService.updatePlayers(roomId, updatedRoom.players);
       connectionManager.broadcastToRoom(roomId, 'room.update', updatedRoom.toJson());
@@ -968,6 +1053,86 @@ class KernelRuntime {
     roomData.remove(roomId);
     _cleanupTimers.remove(roomId)?.cancel();
     connectionManager.evictRoom(roomId);
+  }
+
+  Future<void> _recordPlayerWin(String gameId, String playerId, String name) async {
+    try {
+      final existingPlayer = await (db.select(db.players)..where((t) => t.id.equals(playerId))).getSingleOrNull();
+      if (existingPlayer == null) {
+        await db.into(db.players).insertOnConflictUpdate(PlayersCompanion.insert(
+          id: playerId,
+          name: name,
+          avatar: 'default',
+          lastSeen: DateTime.now(),
+        ));
+      } else {
+        await db.into(db.players).insertOnConflictUpdate(PlayersCompanion.insert(
+          id: playerId,
+          name: name,
+          avatar: existingPlayer.avatar,
+          lastSeen: DateTime.now(),
+        ));
+      }
+
+      final existingStats = await (db.select(db.gameStats)
+        ..where((t) => t.playerId.equals(playerId) & t.gameId.equals(gameId)))
+        .getSingleOrNull();
+
+      if (existingStats == null) {
+        await db.into(db.gameStats).insert(GameStatsCompanion.insert(
+          playerId: playerId,
+          gameId: gameId,
+          wins: const drift.Value(1),
+          losses: const drift.Value(0),
+        ));
+      } else {
+        await db.into(db.gameStats).insertOnConflictUpdate(GameStatsCompanion.insert(
+          playerId: playerId,
+          gameId: gameId,
+          wins: drift.Value(existingStats.wins + 1),
+          losses: drift.Value(existingStats.losses),
+          totalPoints: drift.Value(existingStats.totalPoints),
+          customStatsJson: drift.Value(existingStats.customStatsJson),
+        ));
+      }
+      logSystemEvent('RECORD_WIN: Player $name ($playerId) won in $gameId. Total wins incremented globally.');
+    } catch (e) {
+      _log.warning('Failed to record player win in DB: $e');
+    }
+  }
+
+  Future<void> _handleGameFinished(models.Room room, Map<String, dynamic> finalState, String winnerId) async {
+    final settings = Map<String, dynamic>.from(room.settings);
+    final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
+    
+    final winnerPlayer = room.players.firstWhere(
+      (p) => p.id == winnerId,
+      orElse: () => models.Player(id: winnerId, name: 'Unknown', avatar: 'default'),
+    );
+    
+    final currentWins = leaderboard[winnerId] is Map
+        ? (leaderboard[winnerId]['wins'] ?? 0)
+        : (leaderboard[winnerId] ?? 0);
+        
+    leaderboard[winnerId] = {
+      'name': winnerPlayer.name,
+      'wins': currentWins + 1,
+    };
+    settings['_leaderboard'] = leaderboard;
+    
+    await roomService.updateSettings(room.id, settings);
+    
+    final updatedRoom = room.copyWith(
+      settings: settings,
+      publicGameState: finalState,
+    );
+    roomData[room.id] = updatedRoom;
+    
+    await _recordPlayerWin(room.game.id, winnerId, winnerPlayer.name);
+
+    connectionManager.broadcastToRoom(room.id, 'room.update', updatedRoom.toJson());
+    await roomService.updatePublicState(room.id, finalState);
+    connectionManager.broadcastToRoom(room.id, 'game.public_state', finalState);
   }
 
   void dispose() {

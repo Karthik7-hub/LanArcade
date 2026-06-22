@@ -376,6 +376,7 @@ test('UNO - Reconnect & State Synchronization', () => {
     ];
     engine.onInit({ startingHandSize: 3 }, players);
     
+    engine.state.currentPlayerIndex = 1;
     const originalHand = JSON.parse(JSON.stringify(engine.state.hands['player1']));
     const originalScores = JSON.parse(JSON.stringify(engine.state.scores));
     
@@ -518,3 +519,290 @@ test('Project Coop - Block Pushing & Switch Activation', () => {
     
     assert.ok(block.x > startX, 'Player should push the block');
 });
+
+test('UNO - Triple WildDrawFour Stacking', () => {
+    const engine = loadEngine('assets/engines/uno.js');
+    const players = [
+        { id: 'player1', name: 'Alice' },
+        { id: 'player2', name: 'Bob' },
+        { id: 'player3', name: 'Charlie' }
+    ];
+    engine.onInit({ startingHandSize: 5, stacking: true }, players);
+    
+    engine.state.hands['player1'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Red', value: '9' }, { color: 'Red', value: '8' }];
+    engine.state.hands['player2'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Blue', value: '9' }, { color: 'Blue', value: '8' }];
+    engine.state.hands['player3'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Green', value: '9' }, { color: 'Green', value: '8' }];
+    engine.state.discardPile = [{ color: 'Red', value: '3' }];
+    engine.state.currentColor = 'Red';
+    engine.state.currentValue = '3';
+    engine.state.currentPlayerIndex = 0; // player1
+    engine.state.direction = 1;
+
+    // Player 1 plays WildDrawFour
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+    
+    // Player 2 plays WildDrawFour
+    engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+
+    // Player 3 plays WildDrawFour
+    engine.onAction({ id: 'player3', name: 'Charlie' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+
+    // Player 1 draws cards
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'DRAW_CARD', data: {} });
+    
+    console.log("TEST OUTPUT - Player 1 hand size:", engine.state.hands['player1'].length);
+    console.log("TEST OUTPUT - Player 3 hand size:", engine.state.hands['player3'].length);
+    console.log("TEST OUTPUT - drawPending:", engine.state.drawPending);
+});
+
+test('UNO - 2-Player Triple WildDrawFour Stacking', () => {
+    const engine = loadEngine('assets/engines/uno.js');
+    const players = [
+        { id: 'player1', name: 'Alice' },
+        { id: 'player2', name: 'Bob' }
+    ];
+    engine.onInit({ startingHandSize: 5, stacking: true }, players);
+    
+    engine.state.hands['player1'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Wild', value: 'WildDrawFour' }, { color: 'Red', value: '9' }];
+    engine.state.hands['player2'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Blue', value: '9' }];
+    engine.state.discardPile = [{ color: 'Red', value: '3' }];
+    engine.state.currentColor = 'Red';
+    engine.state.currentValue = '3';
+    engine.state.currentPlayerIndex = 0; // player1
+    engine.state.direction = 1;
+
+    // Alice plays WildDrawFour
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+    
+    // Bob plays WildDrawFour
+    engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+
+    // Alice plays WildDrawFour
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+
+    // Bob draws cards
+    engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'DRAW_CARD', data: {} });
+    
+    console.log("2-PLAYER TEST - Alice hand size:", engine.state.hands['player1'].length);
+    console.log("2-PLAYER TEST - Bob hand size:", engine.state.hands['player2'].length);
+    console.log("2-PLAYER TEST - drawPending:", engine.state.drawPending);
+});
+
+test('UNO - Triple WildDrawFour Stacking with Finisher', () => {
+    const engine = loadEngine('assets/engines/uno.js');
+    const players = [
+        { id: 'player1', name: 'Alice' },
+        { id: 'player2', name: 'Bob' },
+        { id: 'player3', name: 'Charlie' }
+    ];
+    engine.onInit({ startingHandSize: 5, stacking: true }, players);
+    
+    engine.state.hands['player1'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Red', value: '9' }];
+    engine.state.hands['player2'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Blue', value: '9' }];
+    engine.state.hands['player3'] = [{ color: 'Wild', value: 'WildDrawFour' }]; // Charlie has ONLY this card
+    engine.state.discardPile = [{ color: 'Red', value: '3' }];
+    engine.state.currentColor = 'Red';
+    engine.state.currentValue = '3';
+    engine.state.currentPlayerIndex = 0; // Alice
+    engine.state.direction = 1;
+
+    // Alice plays WildDrawFour
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+    
+    // Bob plays WildDrawFour
+    engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+
+    // Charlie plays WildDrawFour (his last card!)
+    engine.onAction({ id: 'player3', name: 'Charlie' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+
+    // Who is the current player now?
+    console.log("FINISHER TEST - Current Player after Charlie finished:", engine.state.playerIds[engine.state.currentPlayerIndex]);
+    console.log("FINISHER TEST - Finished Players:", JSON.stringify(engine.state.finishedPlayers));
+    console.log("FINISHER TEST - drawPending:", engine.state.drawPending);
+
+    // Alice draws cards (since she is next)
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'DRAW_CARD', data: {} });
+    
+    console.log("FINISHER TEST - Alice hand size:", engine.state.hands['player1'].length);
+    console.log("FINISHER TEST - Bob hand size:", engine.state.hands['player2'].length);
+    console.log("FINISHER TEST - Charlie hand size:", engine.state.hands['player3'] ? engine.state.hands['player3'].length : 'undefined/deleted');
+});
+
+test('UNO - Stacking Combinations (+2 on +4 and +4 on +2)', () => {
+    const engine = loadEngine('assets/engines/uno.js');
+    const players = [
+        { id: 'player1', name: 'Alice' },
+        { id: 'player2', name: 'Bob' },
+        { id: 'player3', name: 'Charlie' }
+    ];
+    engine.onInit({ startingHandSize: 5, stacking: true }, players);
+    
+    // Set up hands with different color/value combinations
+    engine.state.hands['player1'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Red', value: '9' }];
+    engine.state.hands['player2'] = [{ color: 'Blue', value: 'DrawTwo' }, { color: 'Blue', value: '9' }]; // different color, DrawTwo
+    engine.state.hands['player3'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Green', value: '9' }];
+    engine.state.discardPile = [{ color: 'Red', value: '3' }];
+    engine.state.currentColor = 'Red';
+    engine.state.currentValue = '3';
+    engine.state.currentPlayerIndex = 0; // Alice
+    engine.state.direction = 1;
+
+    // 1. Alice plays +4 (currentColor becomes Yellow)
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Yellow' } });
+    assert.strictEqual(engine.state.drawPending, 4);
+    assert.strictEqual(engine.state.currentPlayerIndex, 1); // Bob's turn
+
+    // 2. Bob stacks Blue DrawTwo on WildDrawFour (different color, different value type!)
+    engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'PLAY_CARD', data: { cardIndex: 0 } });
+    assert.strictEqual(engine.state.drawPending, 6);
+    assert.strictEqual(engine.state.currentPlayerIndex, 2); // Charlie's turn
+
+    // 3. Charlie stacks WildDrawFour on DrawTwo
+    engine.onAction({ id: 'player3', name: 'Charlie' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
+    assert.strictEqual(engine.state.drawPending, 10);
+    assert.strictEqual(engine.state.currentPlayerIndex, 0); // Alice's turn
+
+    // 4. Alice draws penalty
+    const handSizeBefore = engine.state.hands['player1'].length;
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'DRAW_CARD', data: {} });
+    assert.strictEqual(engine.state.hands['player1'].length, handSizeBefore + 10);
+    assert.strictEqual(engine.state.drawPending, 0);
+});
+
+test('UNO - Turn Timer Timeout Stacking Penalty', () => {
+    const engine = loadEngine('assets/engines/uno.js');
+    const players = [
+        { id: 'player1', name: 'Alice' },
+        { id: 'player2', name: 'Bob' }
+    ];
+    // Initialize with turn timer active
+    engine.onInit({ startingHandSize: 5, stacking: true, turnTimer: 10 }, players);
+
+    engine.state.hands['player1'] = [{ color: 'Wild', value: 'WildDrawFour' }, { color: 'Red', value: '9' }];
+    engine.state.hands['player2'] = [{ color: 'Blue', value: '9' }];
+    engine.state.discardPile = [{ color: 'Red', value: '3' }];
+    engine.state.currentColor = 'Red';
+    engine.state.currentValue = '3';
+    engine.state.currentPlayerIndex = 0; // Alice
+    engine.state.direction = 1;
+
+    // Alice plays +4
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Blue' } });
+    assert.strictEqual(engine.state.drawPending, 4);
+    assert.strictEqual(engine.state.currentPlayerIndex, 1); // Bob's turn
+
+    // Simulate turn timer expiring for Bob (drawPending is 4)
+    const bobHandSizeBefore = engine.state.hands['player2'].length;
+    engine.state.timerRemaining = 0;
+    engine.onTick(0); // Trigger timer check
+
+    // Bob should draw the 4 penalty cards, NOT 1 card
+    assert.strictEqual(engine.state.hands['player2'].length, bobHandSizeBefore + 4);
+    assert.strictEqual(engine.state.drawPending, 0);
+    assert.strictEqual(engine.state.currentPlayerIndex, 0); // Turn advanced back to Alice
+});
+
+test('Project Coop - Procedural Level scaling for 2, 4, 6, 8 players', () => {
+    const engine = loadEngine('assets/engines/project-coop.js');
+    const pCounts = [2, 4, 6, 8];
+    for (let count of pCounts) {
+        const players = [];
+        for (let i = 0; i < count; i++) {
+            players.push({ id: 'player' + (i+1), name: 'Player' + (i+1) });
+        }
+        engine.onInit({ levelType: 'procedural', difficulty: 'medium' }, players);
+        assert.strictEqual(engine.state.status, 'play');
+        assert.ok(engine.state.entities.length > 0, `Entities should be generated for ${count} players`);
+        const door = engine.state.entities.find(e => e.id === 'door1');
+        const keys = engine.state.entities.filter(e => e.type === 'key');
+        assert.ok(door, `Door should exist for ${count} players`);
+        assert.ok(keys.length > 0, `At least one key should exist for ${count} players`);
+        
+        // Assert solvability
+        const verified = engine.verifyLevel(engine.state.entities, count);
+        assert.ok(verified, `Generated level should be verified/solvable for ${count} players`);
+    }
+});
+
+test('Project Coop - AND-gate switches verification', () => {
+    const engine = loadEngine('assets/engines/project-coop.js');
+    const players = [
+        { id: 'player1', name: 'Alice' },
+        { id: 'player2', name: 'Bob' }
+    ];
+    engine.onInit({ levelType: 'handcrafted' }, players);
+    
+    // Set custom entities with an AND gate
+    engine.state.entities = [
+        { id: 'test_gate', type: 'door', x: 300, y: 450, w: 40, h: 100, locked: true },
+        { id: 'sw1', type: 'switch', x: 100, y: 535, w: 32, h: 15, pressed: false, targetId: 'test_gate' },
+        { id: 'sw2', type: 'switch', x: 200, y: 535, w: 32, h: 15, pressed: false, targetId: 'test_gate' }
+    ];
+    
+    const p1 = engine.state.players['player1'];
+    const p2 = engine.state.players['player2'];
+    
+    // Initially, no one is on switches
+    p1.x = 0; p1.y = 0;
+    p2.x = 0; p2.y = 0;
+    engine.updateSwitches(0.016);
+    
+    const gate = engine.state.entities.find(e => e.id === 'test_gate');
+    assert.strictEqual(gate.locked, true, 'Gate should be locked initially');
+    
+    // Stand on sw1 only
+    p1.x = 100; p1.y = 518;
+    engine.updateSwitches(0.016);
+    assert.strictEqual(gate.locked, true, 'Gate should be locked when only one switch is pressed');
+    
+    // Stand on both sw1 and sw2
+    p2.x = 200; p2.y = 518;
+    engine.updateSwitches(0.016);
+    assert.strictEqual(gate.locked, false, 'Gate should unlock when both switches are pressed');
+    
+    // Step off sw1
+    p1.x = 0; p1.y = 0;
+    engine.updateSwitches(0.016);
+    assert.strictEqual(gate.locked, true, 'Gate should lock again when one switch is released');
+});
+
+test('Project Coop - Timed switches verification', () => {
+    const engine = loadEngine('assets/engines/project-coop.js');
+    const players = [
+        { id: 'player1', name: 'Alice' }
+    ];
+    engine.onInit({ levelType: 'handcrafted' }, players);
+    
+    engine.state.entities = [
+        { id: 'test_gate', type: 'door', x: 300, y: 450, w: 40, h: 100, locked: true },
+        { id: 'sw1', type: 'switch', x: 100, y: 535, w: 32, h: 15, pressed: false, targetId: 'test_gate', isTimed: true, duration: 2.0 }
+    ];
+    
+    const p1 = engine.state.players['player1'];
+    const gate = engine.state.entities.find(e => e.id === 'test_gate');
+    const sw1 = engine.state.entities.find(e => e.id === 'sw1');
+    
+    // Player stands on timed switch
+    p1.x = 100; p1.y = 518;
+    engine.updateSwitches(0.016);
+    assert.strictEqual(sw1.pressed, true);
+    assert.strictEqual(gate.locked, false);
+    
+    // Player steps off timed switch
+    p1.x = 0; p1.y = 0;
+    
+    // Tick by 0.5s
+    engine.updateSwitches(0.5);
+    assert.strictEqual(sw1.pressed, true, 'Switch should remain active during timer');
+    assert.strictEqual(gate.locked, false, 'Gate should remain unlocked during timer');
+    
+    // Tick by another 1.6s (total 2.1s, exceeding the 2.0s duration)
+    engine.updateSwitches(1.6);
+    assert.strictEqual(sw1.pressed, false, 'Switch should deactivate after timer expires');
+    assert.strictEqual(gate.locked, true, 'Gate should lock again after timer expires');
+});
+
+
+
+
+
