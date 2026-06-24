@@ -12,6 +12,7 @@ class Players extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get avatar => text()();
+  TextColumn get sessionToken => text().nullable()();
   DateTimeColumn get lastSeen => dateTime()();
 
   @override
@@ -70,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -88,17 +89,16 @@ class AppDatabase extends _$AppDatabase {
               // Ignore if column already exists due to partial upgrades
             }
           }
+          if (from < 4) {
+            try {
+              await m.addColumn(players, players.sessionToken);
+            } catch (e) {
+              // Ignore if column already exists
+            }
+          }
         },
         beforeOpen: (details) async {
-          try {
-            final roomsTableInfo = await customSelect('PRAGMA table_info(rooms)').get();
-            final hasLastActiveAt = roomsTableInfo.any((row) => row.read<String>('name') == 'last_active_at');
-            if (!hasLastActiveAt) {
-              await customStatement('ALTER TABLE "rooms" ADD COLUMN "last_active_at" INTEGER');
-            }
-          } catch (e) {
-            // Ignore/log self-heal errors
-          }
+          await customStatement('PRAGMA foreign_keys = ON;');
         },
       );
 }
@@ -107,6 +107,10 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'arcade.sqlite'));
-    return NativeDatabase(file);
+    return NativeDatabase(file, setup: (rawDb) {
+      rawDb.execute('PRAGMA journal_mode = WAL;');
+      rawDb.execute('PRAGMA synchronous = NORMAL;');
+      rawDb.execute('PRAGMA foreign_keys = ON;');
+    });
   });
 }

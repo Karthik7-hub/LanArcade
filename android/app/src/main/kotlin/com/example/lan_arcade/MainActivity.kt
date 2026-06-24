@@ -33,13 +33,5 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
-
-    override fun onDestroy() {
-        try {
-            val intent = Intent(this, ForegroundService::class.java)
-            stopService(intent)
-        } catch (e: Exception) {}
-        super.onDestroy()
-    }
 }
 

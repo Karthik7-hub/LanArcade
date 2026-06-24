@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../kernel/kernel_manager.dart';
 import '../discovery/discovery_service.dart';
@@ -26,7 +25,6 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   final KernelManager _kernel = KernelManager();
   final DiscoveryService _discovery = DiscoveryService();
-  final NetworkInfo _networkInfo = NetworkInfo();
   StreamSubscription? _subscription;
   
   bool _isRunning = false;
@@ -36,6 +34,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final List<FlSpot> _trafficSpots = [const FlSpot(0, 0)];
   double _timer = 0;
 
+  // Cache QR image to avoid expensive rebuilds
+  Widget? _cachedQrWidget;
+  String? _cachedQrUrl;
+
   @override
   void initState() {
     super.initState();
@@ -43,16 +45,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _activeRoomsCount = _kernel.activeRoomsCount;
     _subscription = _kernel.statsStream.listen((event) {
       if (mounted) {
-        setState(() {
-          if (event.containsKey('status')) {
-            _isRunning = event['status'] == 'running';
-          }
-          if (event.containsKey('activeConnections')) {
-            _activePlayersCount = event['activeConnections'];
-            _updateChart(_activePlayersCount.toDouble());
-          }
-          _activeRoomsCount = _kernel.activeRoomsCount;
-        });
+        if (event.containsKey('status') ||
+            event.containsKey('activeConnections') ||
+            event.containsKey('activeRooms')) {
+          setState(() {
+            if (event.containsKey('status')) {
+              _isRunning = event['status'] == 'running';
+            }
+            if (event.containsKey('activeConnections')) {
+              _activePlayersCount = event['activeConnections'];
+              _updateChart(_activePlayersCount.toDouble());
+              if (_isRunning) {
+                _discovery.updatePlayersCount(_activePlayersCount);
+              }
+            }
+            if (event.containsKey('activeRooms')) {
+              _activeRoomsCount = event['activeRooms'];
+            } else {
+              _activeRoomsCount = _kernel.activeRoomsCount;
+            }
+          });
+        }
       }
     });
   }
@@ -81,11 +94,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
       if (!batteryStatus.isGranted) {
         await Permission.ignoreBatteryOptimizations.request();
-      }
-
-      final locationStatus = await Permission.location.status;
-      if (!locationStatus.isGranted) {
-        await Permission.location.request();
       }
     }
   }
@@ -135,22 +143,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
     } else {
       await _requestPermissions();
       await _kernel.start();
-      String? ip = await _networkInfo.getWifiIP();
-      if (ip == null || ip.isEmpty) {
-        try {
-          final interfaces = await NetworkInterface.list();
-          for (var interface in interfaces) {
-            for (var addr in interface.addresses) {
-              if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-                ip = addr.address;
-                break;
-              }
+      String? ip;
+      try {
+        final interfaces = await NetworkInterface.list();
+        for (var interface in interfaces) {
+          for (var addr in interface.addresses) {
+            if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+              ip = addr.address;
+              break;
             }
-            if (ip != null) break;
           }
-        } catch (e) {
-          debugPrint("Interface scanning failed: $e");
+          if (ip != null) break;
         }
+      } catch (e) {
+        debugPrint("Interface scanning failed: $e");
       }
       ip ??= "127.0.0.1";
       try {
@@ -441,6 +447,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildNetworkCard() {
     final String serverUrl = "http://${_ipAddress ?? '0.0.0.0'}:8080";
+    
+    if (_cachedQrWidget == null || _cachedQrUrl != serverUrl) {
+      _cachedQrUrl = serverUrl;
+      _cachedQrWidget = QrImageView(
+        data: serverUrl,
+        version: QrVersions.auto,
+        size: 160,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: Color(0xFF0F172A),
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: Color(0xFF0F172A),
+        ),
+      );
+    }
+
     return ArcadeCard(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -461,19 +485,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: QrImageView(
-              data: serverUrl,
-              version: QrVersions.auto,
-              size: 160,
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.square,
-                color: Color(0xFF0F172A),
-              ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.square,
-                color: Color(0xFF0F172A),
-              ),
-            ),
+            child: _cachedQrWidget!,
           ),
           const SizedBox(height: 20),
           InkWell(

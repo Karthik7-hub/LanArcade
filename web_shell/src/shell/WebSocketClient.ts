@@ -39,6 +39,7 @@ class WebSocketClient {
   private reconnectTimer: any = null;
   private messageQueue: { type: string; payload: any }[] = [];
   private pingInterval: any = null;
+  private reconnectAttempts = 0;
 
   connect(url: string) {
     this.url = url;
@@ -48,6 +49,7 @@ class WebSocketClient {
 
     this.socket.onopen = () => {
       console.log('Connected to Lan Arcade Kernel');
+      this.reconnectAttempts = 0;
       useStore.getState().setConnected(true);
 
       // Auto identify if player exists
@@ -103,10 +105,16 @@ class WebSocketClient {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
+    this.reconnectAttempts++;
+    
+    // Exponential backoff with random jitter: base 1.5, min ~1s, max 10s
+    const delay = Math.min(10000, 1000 * Math.pow(1.5, this.reconnectAttempts)) + Math.random() * 1000;
+    console.log(`Scheduling reconnect in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts})`);
+    
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect(this.url);
-    }, 2000);
+    }, delay);
   }
 
   private startHeartbeat() {
@@ -187,11 +195,13 @@ class WebSocketClient {
     if (this.socket?.readyState === WebSocket.OPEN) {
       useStore.getState().addDebugLog(`→ OUT: ${type}`);
       this.socket.send(JSON.stringify({ type, payload }));
-    } else {
-      console.warn('Socket not open. Queueing message:', type);
+    } else if (this.socket?.readyState === WebSocket.CONNECTING) {
+      console.warn('Socket connecting. Queueing message:', type);
       if (type.startsWith('game.') || type.startsWith('room.')) {
         this.messageQueue.push({ type, payload });
       }
+    } else {
+      console.warn('Socket offline/disconnected. Dropping message:', type);
     }
   }
 }

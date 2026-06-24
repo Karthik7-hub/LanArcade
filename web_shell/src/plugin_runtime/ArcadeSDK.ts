@@ -55,6 +55,4 @@ export const ArcadeSDK = {
     }
 };
 
-// Expose to window so the Iframe (Game) can access it via window.parent.Arcade
-(window as any).Arcade = ArcadeSDK;
 

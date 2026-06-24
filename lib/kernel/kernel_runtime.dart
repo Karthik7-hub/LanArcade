@@ -19,18 +19,39 @@ import '../shared/models.dart' as models;
 import 'asset_extractor.dart';
 import '../plugins/js_engine.dart';
 import '../plugins/plugin_manager.dart';
+import 'handlers/message_handler.dart';
+import 'handlers/player_handler.dart';
+import 'handlers/room_handler.dart';
+import 'handlers/game_handler.dart';
+import 'game_engine_factory.dart';
 
 final _log = Logger('KernelRuntime');
 
-class KernelRuntime {
+class KernelRuntime implements KernelContext {
+  @override
   final PluginManager pluginManager;
+  @override
   final AppDatabase db;
+  @override
   final RoomService roomService;
+  @override
   final ConnectionManager connectionManager = ConnectionManager();
+  @override
   final Map<String, JsEngine> activeEngines = {};
+  @override
   final Map<String, models.Room> roomData = {};
+
   final Map<String, Timer> _cleanupTimers = {};
+  @override
+  Map<String, Timer> get cleanupTimers => _cleanupTimers;
+
+  final Map<String, DateTime> _lastStateWrite = {};
+  @override
+  Map<String, DateTime> get lastStateWrite => _lastStateWrite;
+
   final Uuid _uuid = const Uuid();
+  @override
+  Uuid get uuid => _uuid;
 
   HttpServer? _server;
   bool _isRunning = false;
@@ -40,16 +61,35 @@ class KernelRuntime {
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get statsStream => _statsController.stream;
 
+  final MessageRouter _router = MessageRouter();
+
+  @override
   void logSystemEvent(String msg) {
     _log.info(msg);
     _statsController.add({'log': msg});
+  }
+
+  @override
+  void addStats(Map<String, dynamic> event) {
+    _statsController.add(event);
   }
 
   KernelRuntime({
     required this.pluginManager,
     required this.db,
     required this.roomService,
-  });
+  }) {
+    // Register all message handlers.
+    _router.register('ping', PingHandler());
+    _router.register('player.identify', PlayerHandler());
+    _router.register('room.create', RoomCreateHandler());
+    _router.register('room.join', RoomJoinHandler());
+    _router.register('room.update_settings', RoomUpdateSettingsHandler());
+    _router.register('room.change_game', RoomChangeGameHandler());
+    _router.register('room.reset', RoomResetHandler());
+    _router.register('room.leave', RoomLeaveHandler());
+    _router.register('game.action', GameActionHandler());
+  }
 
   Future<void> start(String shellAssetsPath) async {
     if (_isRunning) return;
@@ -130,9 +170,14 @@ class KernelRuntime {
     router.get('/games/<gameId>/<file|.*>',
         (Request request, String gameId, String file) async {
       final root = shellAssetsPath.replaceAll('shell_assets', '');
-      final gamePath = p.join(root, 'game_assets', gameId);
+      final gameDir = Directory(p.join(root, 'game_assets', gameId)).absolute;
       final filePath = (file.isEmpty || file == '/') ? 'index.html' : file;
-      final fileToServe = File(p.join(gamePath, filePath));
+      final fileToServe = File(p.join(gameDir.path, filePath)).absolute;
+      
+      if (!fileToServe.path.startsWith(gameDir.path)) {
+        return Response.forbidden('Access denied');
+      }
+      
       if (!await fileToServe.exists()) {
         await AssetExtractor.extractGameAssets(gameId);
       }
@@ -175,7 +220,7 @@ class KernelRuntime {
 
       _statsController.add({
         'log': 'WS_CONNECTION: $connectionId',
-        'activeConnections': connectionManager.identifiedCount, // only identified players
+        'activeConnections': connectionManager.identifiedCount,
       });
 
       channel.stream.listen(
@@ -184,7 +229,7 @@ class KernelRuntime {
             final data = jsonDecode(message as String);
             final String type = data['type'];
             final dynamic payload = data['payload'];
-            await _handleMessage(connectionId, type, payload);
+            await _router.route(connectionId, type, payload, this);
           } catch (e, stack) {
             _log.severe('Error processing WS message: $e', e, stack);
             final conn = connectionManager.getConnection(connectionId);
@@ -286,531 +331,7 @@ class KernelRuntime {
     _statsController.add({'status': 'stopped', 'log': 'SERVER_STOPPED'});
   }
 
-  // --- Message Handling ---
-
-  Future<void> _handleMessage(
-      String connectionId, String type, dynamic payload) async {
-    final connection = connectionManager.getConnection(connectionId);
-    if (connection == null) return;
-
-    switch (type) {
-      case 'ping':
-        connection.send('pong', null);
-        break;
-
-      case 'player.identify':
-        final String playerId = payload['id'] ?? '';
-        if (playerId.isNotEmpty && connectionManager.isPlayerOnlineGlobally(playerId, connectionId)) {
-          connection.send('system.error', 'This Player ID is already active on another device.');
-          return;
-        }
-
-        String? name = payload['name'];
-        String avatar = payload['avatar'] ?? 'default';
-
-        if (name == null || name.trim().isEmpty) {
-          if (playerId.isEmpty) {
-            connection.send('system.error', 'Username is required.');
-            return;
-          }
-          final dbPlayer = await (db.select(db.players)..where((t) => t.id.equals(playerId))).getSingleOrNull();
-          if (dbPlayer == null) {
-            connection.send('system.error', 'No profile found for this Player ID.');
-            return;
-          }
-          name = dbPlayer.name;
-          avatar = dbPlayer.avatar;
-        }
-
-        final resolvedPlayerId = playerId.isEmpty ? _uuid.v4() : playerId;
-
-        await db.into(db.players).insertOnConflictUpdate(PlayersCompanion.insert(
-          id: resolvedPlayerId,
-          name: name,
-          avatar: avatar,
-          lastSeen: DateTime.now(),
-        ));
-
-        final player = models.Player(
-          id: resolvedPlayerId,
-          name: name,
-          avatar: avatar,
-        );
-        connection.player = player;
-        connectionManager.removeStaleConnections(player.id, connectionId);
-
-        // Fetch global wins for this player
-        final statsList = await (db.select(db.gameStats)..where((t) => t.playerId.equals(player.id))).get();
-        int totalWins = 0;
-        final gameWins = <String, int>{};
-        for (var stat in statsList) {
-          totalWins += stat.wins;
-          gameWins[stat.gameId] = stat.wins;
-        }
-        final statsPayload = {
-          'totalWins': totalWins,
-          'gameWins': gameWins,
-        };
-
-        final playerJson = Map<String, dynamic>.from(player.toJson());
-        playerJson['stats'] = statsPayload;
-
-        connection.send('player.identified', playerJson);
-        logSystemEvent('PLAYER_IDENTIFIED: connectionId=$connectionId, player=${player.name} (${player.id})');
-        // Update admin dashboard player count to only show identified players
-        _statsController.add({'activeConnections': connectionManager.identifiedCount});
-
-
-        if (connection.roomId != null) {
-          final roomId = connection.roomId!;
-          final room = roomData[roomId];
-          if (room != null) {
-            bool changed = false;
-            for (int i = 0; i < room.players.length; i++) {
-              if (room.players[i].id == player.id) {
-                room.players[i] = player;
-                changed = true;
-              }
-            }
-            for (int i = 0; i < room.spectators.length; i++) {
-              if (room.spectators[i].id == player.id) {
-                room.spectators[i] = player;
-                changed = true;
-              }
-            }
-            if (changed) {
-              await roomService.updatePlayers(roomId, room.players);
-              connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
-              final engine = activeEngines[roomId];
-              engine?.playerJoined(player);
-            }
-          }
-        }
-        break;
-
-      case 'room.create':
-        if (connection.player == null) return;
-        final manifest = pluginManager.getManifest(payload['gameId']);
-        if (manifest == null) {
-          connection.send('system.error', 'Game not found');
-          return;
-        }
-
-        // Enforce max players at creation (min 1 = the host)
-        await AssetExtractor.extractGameAssets(manifest.id);
-
-        final initialSettings = <String, dynamic>{};
-        if (manifest.settingsSchema != null) {
-          manifest.settingsSchema!.forEach((key, value) {
-            if (value is Map && value.containsKey('default')) {
-              initialSettings[key] = value['default'];
-            }
-          });
-        }
-        if (payload['settings'] is Map) {
-          initialSettings.addAll(Map<String, dynamic>.from(payload['settings'] as Map));
-        }
-
-        final room = await roomService.createRoom(
-            manifest, connection.player!, initialSettings);
-        if (room != null) {
-          connection.roomId = room.id;
-          roomData[room.id] = room;
-          connection.send('room.update', room.toJson());
-          logSystemEvent('ROOM_CREATED: roomCode=${room.code}, game=${manifest.name}, host=${connection.player!.name}');
-
-          final code = await pluginManager.getEngineCode(manifest.id);
-          final engine = JsEngine(
-            manifest: manifest,
-            onLog: logSystemEvent,
-            onPublicState: (state) {
-              final currentRoom = roomData[room.id];
-              if (currentRoom != null) {
-                // Intercept game finish to increment wins
-                Map<String, dynamic> finalState = Map<String, dynamic>.from(state);
-                if (finalState['status'] == 'finished' && finalState['winner'] != null) {
-                  final winnerId = finalState['winner'] as String;
-                  final oldState = currentRoom.publicGameState;
-                  final wasFinished = oldState != null && oldState['status'] == 'finished';
-                  if (!wasFinished) {
-                    final settings = Map<String, dynamic>.from(currentRoom.settings);
-                    final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
-                    
-                    // Find winner name
-                    final winnerPlayer = currentRoom.players.firstWhere(
-                      (p) => p.id == winnerId,
-                      orElse: () => models.Player(id: winnerId, name: 'Unknown', avatar: 'default'),
-                    );
-                    
-                    final currentWins = leaderboard[winnerId] is Map
-                        ? (leaderboard[winnerId]['wins'] ?? 0)
-                        : (leaderboard[winnerId] ?? 0);
-                        
-                    leaderboard[winnerId] = {
-                      'name': winnerPlayer.name,
-                      'wins': currentWins + 1,
-                    };
-                    settings['_leaderboard'] = leaderboard;
-                    
-                    // Save to DB and broadcast room.update
-                    roomService.updateSettings(room.id, settings);
-                    
-                    // Create updated room with settings and final state
-                    final updatedRoom = currentRoom.copyWith(
-                      settings: settings,
-                      publicGameState: finalState,
-                    );
-                    roomData[room.id] = updatedRoom;
-                    connectionManager.broadcastToRoom(room.id, 'room.update', updatedRoom.toJson());
-                    roomService.updatePublicState(room.id, finalState);
-                    connectionManager.broadcastToRoom(room.id, 'game.public_state', finalState);
-                    return;
-                  }
-                }
-                roomData[room.id] = currentRoom.copyWith(publicGameState: finalState);
-              }
-              roomService.updatePublicState(room.id, state);
-              connectionManager.broadcastToRoom(
-                  room.id, 'game.public_state', state);
-            },
-            onPrivateState: (pid, state) =>
-                connectionManager.sendPrivate(pid, 'game.private_state', state),
-            onAchievement: (pid, aid) async {
-              try {
-                await db.into(db.achievements).insert(AchievementsCompanion.insert(
-                  playerId: pid,
-                  gameId: manifest.id,
-                  achievementId: aid,
-                  unlockedAt: DateTime.now(),
-                ));
-                connectionManager.broadcastToRoom(room.id, 'game.achievement_unlocked', {
-                  'playerId': pid,
-                  'achievementId': aid,
-                });
-              } catch (_) {}
-            },
-          );
-          await engine.load(code);
-          activeEngines[room.id] = engine;
-        }
-        break;
-
-      case 'room.join':
-        if (connection.player == null) return;
-        final code = payload['code'] as String;
-        final roomId = roomData.keys.firstWhere(
-          (id) => roomData[id]!.code == code,
-          orElse: () => '',
-        );
-
-        if (roomId.isNotEmpty) {
-          var room = roomData[roomId]!;
-
-          // If current host is offline, transfer host privileges to the joining/reconnecting player
-          final isHostOnline = connectionManager.isPlayerOnline(room.hostId, roomId);
-          if (!isHostOnline) {
-            room = room.copyWith(hostId: connection.player!.id);
-            roomData[roomId] = room;
-            await roomService.updateHost(roomId, connection.player!.id);
-            logSystemEvent('HOST_TRANSFERRED: host of roomCode=$code transferred to ${connection.player!.name} because previous host was offline.');
-          }
-
-          final isAlreadyInRoom = room.players.any((p) => p.id == connection.player!.id);
-          final isAlreadySpectating = room.spectators.any((p) => p.id == connection.player!.id);
-
-          // Cancel any pending cleanup timers for this room since a player has joined or rejoined
-          if (_cleanupTimers.containsKey(roomId)) {
-            _cleanupTimers[roomId]?.cancel();
-            _cleanupTimers.remove(roomId);
-            logSystemEvent('CLEANUP_TIMER_CANCELLED: Player joined/rejoined roomCode=$code.');
-          }
-
-          if (isAlreadyInRoom) {
-            logSystemEvent('PLAYER_RECONNECTED: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
-            connection.roomId = roomId;
-            connection.send('room.update', room.toJson());
-            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
-
-            final engine = activeEngines[roomId];
-            engine?.playerJoined(connection.player!);
-          } else if (isAlreadySpectating) {
-            logSystemEvent('SPECTATOR_RECONNECTED: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
-            connection.roomId = roomId;
-            connection.send('room.update', room.toJson());
-            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
-          } else if (room.status == models.RoomStatus.active) {
-            // Join as spectator mid-game
-            room.spectators.add(connection.player!);
-            logSystemEvent('PLAYER_JOINED_AS_SPECTATOR: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
-            connection.roomId = roomId;
-            connection.send('room.update', room.toJson());
-            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
-          } else {
-            // Join as normal player
-            if (room.players.length >= room.game.maxPlayers) {
-              connection.send('system.error', 'Room is full');
-              return;
-            }
-            room.players.add(connection.player!);
-            await roomService.updatePlayers(roomId, room.players);
-            logSystemEvent('PLAYER_JOINED_ROOM: roomCode=$code, player=${connection.player!.name} (${connection.player!.id})');
-            connection.roomId = roomId;
-            connection.send('room.update', room.toJson());
-            connectionManager.broadcastToRoom(roomId, 'room.update', room.toJson());
-
-            final engine = activeEngines[roomId];
-            engine?.playerJoined(connection.player!);
-          }
-        } else {
-          connection.send('system.error', 'Room not found');
-        }
-        break;
-
-      case 'room.update_settings':
-        if (connection.roomId == null || connection.player == null) return;
-        final roomId = connection.roomId!;
-        final room = roomData[roomId];
-        if (room != null && connection.player!.id == room.hostId) {
-          final settings = Map<String, dynamic>.from(payload['settings'] as Map? ?? {});
-          final updatedRoom = room.copyWith(settings: settings);
-          roomData[roomId] = updatedRoom;
-          await roomService.updateSettings(roomId, settings);
-          connectionManager.broadcastToRoom(
-              roomId, 'room.update', updatedRoom.toJson());
-
-          final engine = activeEngines[roomId];
-          engine?.settingsUpdated(settings);
-        }
-        break;
-
-      case 'room.change_game':
-        if (connection.roomId == null || connection.player == null) return;
-        final roomId = connection.roomId!;
-        final room = roomData[roomId];
-        if (room != null && connection.player!.id == room.hostId) {
-          final gameId = payload['gameId'] as String;
-          final manifest = pluginManager.getManifest(gameId);
-          if (manifest == null) return;
-
-          // Extract game assets if needed
-          await AssetExtractor.extractGameAssets(manifest.id);
-
-          // Get default settings for new game
-          final newSettings = <String, dynamic>{};
-          if (manifest.settingsSchema != null) {
-            manifest.settingsSchema!.forEach((key, value) {
-              if (value is Map && value.containsKey('default')) {
-                newSettings[key] = value['default'];
-              }
-            });
-          }
-
-          // Retain the room-wide leaderboard if it exists in settings
-          if (room.settings.containsKey('_leaderboard')) {
-            newSettings['_leaderboard'] = room.settings['_leaderboard'];
-          }
-
-          // Concatenate spectators back into room.players
-          final allPlayers = [...room.players, ...room.spectators];
-
-          // Dispose old engine
-          final oldEngine = activeEngines.remove(roomId);
-          oldEngine?.dispose();
-
-          final updatedRoom = room.copyWith(
-            players: allPlayers,
-            spectators: [],
-            game: manifest,
-            settings: newSettings,
-            publicGameState: null,
-          );
-          roomData[roomId] = updatedRoom;
-
-          await roomService.updatePlayers(roomId, allPlayers);
-          await roomService.updateGame(roomId, manifest, newSettings);
-          await roomService.updatePublicState(roomId, {});
-
-          // Load code for new game and create engine
-          final code = await pluginManager.getEngineCode(manifest.id);
-          logSystemEvent('ROOM_GAME_CHANGED: roomCode=${room.code}, game=${manifest.name}');
-          final newEngine = JsEngine(
-            manifest: manifest,
-            onLog: logSystemEvent,
-            onPublicState: (state) {
-              final currentRoom = roomData[room.id];
-              if (currentRoom != null) {
-                // Intercept game finish to increment wins
-                Map<String, dynamic> finalState = Map<String, dynamic>.from(state);
-                if (finalState['status'] == 'finished' && finalState['winner'] != null) {
-                  final winnerId = finalState['winner'] as String;
-                  final oldState = currentRoom.publicGameState;
-                  final wasFinished = oldState != null && oldState['status'] == 'finished';
-                  if (!wasFinished) {
-                    _handleGameFinished(currentRoom, finalState, winnerId);
-                    return;
-                  }
-                }
-                roomData[room.id] = currentRoom.copyWith(publicGameState: finalState);
-              }
-              roomService.updatePublicState(room.id, state);
-              connectionManager.broadcastToRoom(
-                  room.id, 'game.public_state', state);
-            },
-            onPrivateState: (pid, state) =>
-                connectionManager.sendPrivate(pid, 'game.private_state', state),
-            onAchievement: (pid, aid) async {
-              try {
-                await db.into(db.achievements).insert(AchievementsCompanion.insert(
-                  playerId: pid,
-                  gameId: manifest.id,
-                  achievementId: aid,
-                  unlockedAt: DateTime.now(),
-                ));
-                connectionManager.broadcastToRoom(room.id, 'game.achievement_unlocked', {
-                  'playerId': pid,
-                  'achievementId': aid,
-                });
-              } catch (_) {}
-            },
-          );
-          await newEngine.load(code);
-          activeEngines[room.id] = newEngine;
-
-          connectionManager.broadcastToRoom(
-              roomId, 'room.update', updatedRoom.toJson());
-        }
-        break;
-
-      case 'room.reset':
-        if (connection.roomId == null || connection.player == null) return;
-        final roomId = connection.roomId!;
-        final room = roomData[roomId];
-        if (room != null && connection.player!.id == room.hostId) {
-          // Concatenate spectators back into room.players
-          final allPlayers = [...room.players, ...room.spectators];
-
-          // Dispose old engine
-          final oldEngine = activeEngines.remove(roomId);
-          oldEngine?.dispose();
-
-          final updatedRoom = room.copyWith(
-            players: allPlayers,
-            spectators: [],
-            status: models.RoomStatus.waiting,
-            publicGameState: null,
-          );
-          roomData[roomId] = updatedRoom;
-
-          await roomService.updatePlayers(roomId, allPlayers);
-          await roomService.updateStatus(roomId, models.RoomStatus.waiting);
-          await roomService.updatePublicState(roomId, {});
-
-          // Load code for game and create fresh engine
-          final code = await pluginManager.getEngineCode(room.game.id);
-          logSystemEvent('ROOM_RESET: roomCode=${room.code}');
-          final newEngine = JsEngine(
-            manifest: room.game,
-            onLog: logSystemEvent,
-            onPublicState: (state) {
-              final currentRoom = roomData[room.id];
-              if (currentRoom != null) {
-                // Intercept game finish to increment wins
-                Map<String, dynamic> finalState = Map<String, dynamic>.from(state);
-                if (finalState['status'] == 'finished' && finalState['winner'] != null) {
-                  final winnerId = finalState['winner'] as String;
-                  final oldState = currentRoom.publicGameState;
-                  final wasFinished = oldState != null && oldState['status'] == 'finished';
-                  if (!wasFinished) {
-                    _handleGameFinished(currentRoom, finalState, winnerId);
-                    return;
-                  }
-                }
-                roomData[room.id] = currentRoom.copyWith(publicGameState: finalState);
-              }
-              roomService.updatePublicState(room.id, state);
-              connectionManager.broadcastToRoom(
-                  room.id, 'game.public_state', state);
-            },
-            onPrivateState: (pid, state) =>
-                connectionManager.sendPrivate(pid, 'game.private_state', state),
-            onAchievement: (pid, aid) async {
-              try {
-                await db.into(db.achievements).insert(AchievementsCompanion.insert(
-                  playerId: pid,
-                  gameId: room.game.id,
-                  achievementId: aid,
-                  unlockedAt: DateTime.now(),
-                ));
-                connectionManager.broadcastToRoom(room.id, 'game.achievement_unlocked', {
-                  'playerId': pid,
-                  'achievementId': aid,
-                });
-              } catch (_) {}
-            },
-          );
-          await newEngine.load(code);
-          activeEngines[room.id] = newEngine;
-
-          connectionManager.broadcastToRoom(
-              roomId, 'room.update', updatedRoom.toJson());
-        }
-        break;
-
-      case 'room.leave':
-        if (connection.roomId == null || connection.player == null) return;
-        final roomId = connection.roomId!;
-        await _handlePlayerLeaveRoom(roomId, connection.player!);
-        connection.roomId = null;
-        connection.send('room.update', null);
-        break;
-
-      case 'game.action':
-        if (connection.roomId == null || connection.player == null) return;
-        final engine = activeEngines[connection.roomId];
-        if (engine == null) return;
-
-        if (payload['type'] == 'START') {
-          final roomId = connection.roomId!;
-          final room = roomData[roomId];
-          if (room != null) {
-            if (room.players.length < room.game.minPlayers) {
-              connection.send('system.error', 'Not enough players to start the game.');
-              return;
-            }
-            final updatedRoom = room.copyWith(status: models.RoomStatus.active);
-            roomData[roomId] = updatedRoom;
-            engine.init(updatedRoom.settings, updatedRoom.players);
-            await roomService.updateStatus(roomId, models.RoomStatus.active);
-            
-            // Retrieve latest room from cache which contains the updated publicGameState
-            final finalRoom = roomData[roomId] ?? updatedRoom;
-            connectionManager.broadcastToRoom(
-                roomId, 'room.update', finalRoom.toJson());
-          }
-        } else if (payload['type'] == 'UNLOCK_ACHIEVEMENT') {
-          final aid = payload['data']['achievementId'] as String;
-          try {
-            await db.into(db.achievements).insert(AchievementsCompanion.insert(
-              playerId: connection.player!.id,
-              gameId: engine.manifest.id,
-              achievementId: aid,
-              unlockedAt: DateTime.now(),
-            ));
-            connectionManager.broadcastToRoom(connection.roomId!, 'game.achievement_unlocked', {
-              'playerId': connection.player!.id,
-              'achievementId': aid,
-            });
-          } catch (_) {}
-        } else {
-          engine.handleAction(
-              connection.player!, payload['type'], payload['data'] ?? {});
-        }
-
-        await roomService.addEvent(
-            connection.roomId!, connection.player!.id, payload['type'], payload['data']);
-        break;
-    }
-  }
+  // --- Disconnect Handling ---
 
   void _handleDisconnect(String connectionId) {
     final connection = connectionManager.getConnection(connectionId);
@@ -850,7 +371,7 @@ class KernelRuntime {
           final currentRemaining = connectionManager.getActiveConnectionsCount(roomId);
           if (currentRemaining == 0) {
             logSystemEvent('CLEANUP_TIMER_EXPIRED: roomCode=$roomCode. Destroying room.');
-            await _destroyRoom(roomId);
+            await RoomLifecycle.destroyRoom(roomId, this);
           }
         });
       }
@@ -858,6 +379,9 @@ class KernelRuntime {
       connectionManager.removeConnection(connectionId);
       logSystemEvent('WS_CLOSED: connectionId=$connectionId');
     }
+    
+    // Broadcast updated player count to admin dashboard
+    _statsController.add({'activeConnections': connectionManager.identifiedCount});
   }
 
   // --- Recovery ---
@@ -888,66 +412,28 @@ class KernelRuntime {
           );
           roomData[room.id] = room;
 
-          final engine = JsEngine(
+          final engine = GameEngineFactory.createEngine(
             manifest: manifest,
-            onLog: logSystemEvent,
-            onPublicState: (state) {
-              final currentRoom = roomData[room.id];
-              if (currentRoom != null) {
-                roomData[room.id] = currentRoom.copyWith(publicGameState: state);
-              }
-              roomService.updatePublicState(room.id, state);
-              connectionManager.broadcastToRoom(
-                  room.id, 'game.public_state', state);
-            },
-            onPrivateState: (pid, state) =>
-                connectionManager.sendPrivate(pid, 'game.private_state', state),
-            onAchievement: (pid, aid) async {
-              try {
-                await db.into(db.achievements).insert(AchievementsCompanion.insert(
-                  playerId: pid,
-                  gameId: manifest.id,
-                  achievementId: aid,
-                  unlockedAt: DateTime.now(),
-                ));
-                connectionManager.broadcastToRoom(room.id, 'game.achievement_unlocked', {
-                  'playerId': pid,
-                  'achievementId': aid,
-                });
-              } catch (_) {}
-            },
+            roomId: room.id,
+            ctx: this,
+            interceptWins: false,
           );
           await engine.load(await pluginManager.getEngineCode(manifest.id));
-          engine.init(
-              room.settings, room.players);
+          engine.init(room.settings, room.players);
 
-          // Replay events with actual player IDs
-          final eventsQuery = db.select(db.eventLog)
-            ..where((t) => t.roomId.equals(room.id))
-            ..orderBy([
-              (t) => drift.OrderingTerm(expression: t.timestamp)
-            ]);
-
-          final events = await eventsQuery.get();
-
-          for (var event in events) {
-            final payload =
-                jsonDecode(event.payloadJson) as Map<String, dynamic>;
-            // Find the player who made this action from the stored event
-            // For recovery, we use the room's player list
-            final eventPlayerId = payload['_playerId'] as String?;
-            final recoveryPlayer = eventPlayerId != null
-                ? players.firstWhere(
-                    (p) => p.id == eventPlayerId,
-                    orElse: () => models.Player(
-                        id: eventPlayerId, name: 'Recovered', avatar: 'bot'),
-                  )
-                : players.isNotEmpty
-                    ? players.first
-                    : models.Player(
-                        id: 'recovery', name: 'System', avatar: 'bot');
-            engine.handleAction(recoveryPlayer, event.type, payload);
+          if (dbRoom.publicGameStateJson != null && dbRoom.publicGameStateJson!.isNotEmpty) {
+            try {
+              final stateMap = jsonDecode(dbRoom.publicGameStateJson!) as Map<String, dynamic>;
+              engine.restoreState(stateMap);
+              logSystemEvent('RECOVER_STATE_SUCCESS: roomCode=${room.code}');
+            } catch (e) {
+              logSystemEvent('RECOVER_STATE_FAILED: roomCode=${room.code}, error=$e. Falling back to event replay.');
+              await _replayEventsForRecovery(engine, room.id, players);
+            }
+          } else {
+            await _replayEventsForRecovery(engine, room.id, players);
           }
+
           activeEngines[room.id] = engine;
           _statsController
               .add({'log': 'Recovered Room: ${room.code}'});
@@ -958,89 +444,27 @@ class KernelRuntime {
     }
   }
 
-  Future<void> _handlePlayerLeaveRoom(String roomId, models.Player player) async {
-    final room = roomData[roomId];
-    if (room == null) return;
+  Future<void> _replayEventsForRecovery(JsEngine engine, String roomId, List<models.Player> players) async {
+    final eventsQuery = db.select(db.eventLog)
+      ..where((t) => t.roomId.equals(roomId))
+      ..orderBy([
+        (t) => drift.OrderingTerm(expression: t.timestamp)
+      ]);
 
-    final wasPlayer = room.players.any((p) => p.id == player.id);
-    room.players.removeWhere((p) => p.id == player.id);
-    room.spectators.removeWhere((p) => p.id == player.id);
+    final events = await eventsQuery.get();
 
-    final engine = activeEngines[roomId];
-    if (engine != null && wasPlayer) {
-      engine.playerLeft(player);
-    }
-
-    if (room.players.isEmpty) {
-      _cleanupTimers[roomId]?.cancel();
-      _cleanupTimers.remove(roomId);
-      await _destroyRoom(roomId);
-    } else {
-      var updatedRoom = room.copyWith(
-        players: room.players,
-        spectators: room.spectators,
-      );
-      if (room.hostId == player.id) {
-        final newHost = room.players.first;
-        updatedRoom = updatedRoom.copyWith(hostId: newHost.id);
-        await roomService.updateHost(roomId, newHost.id);
-      }
-
-      if (room.status == models.RoomStatus.active && room.players.length == 1) {
-        final remainingPlayer = room.players.first;
-        final settings = Map<String, dynamic>.from(room.settings);
-        final winOnAbandonment = settings['winOnAbandonment'] ?? true;
-        
-        if (winOnAbandonment) {
-          final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
-          
-          final currentWins = leaderboard[remainingPlayer.id] is Map
-              ? (leaderboard[remainingPlayer.id]['wins'] ?? 0)
-              : (leaderboard[remainingPlayer.id] ?? 0);
-              
-          leaderboard[remainingPlayer.id] = {
-            'name': remainingPlayer.name,
-            'wins': currentWins + 1,
-          };
-          settings['_leaderboard'] = leaderboard;
-          
-          final activeEngine = activeEngines.remove(roomId);
-          activeEngine?.dispose();
-          
-          updatedRoom = updatedRoom.copyWith(
-            status: models.RoomStatus.waiting,
-            settings: settings,
-            publicGameState: null,
-          );
-          
-          await roomService.updateSettings(roomId, settings);
-          await roomService.updateStatus(roomId, models.RoomStatus.waiting);
-          await roomService.updatePublicState(roomId, {});
-          logSystemEvent('SINGLE_PLAYER_LEFT: Only ${remainingPlayer.name} is left. Awarded win. Room returned to lobby.');
-
-          // Record win globally in DB
-          _recordPlayerWin(room.game.id, remainingPlayer.id, remainingPlayer.name);
-        } else {
-          logSystemEvent('SINGLE_PLAYER_LEFT: Only ${remainingPlayer.name} is left, but winOnAbandonment is disabled.');
-        }
-      }
-
-      roomData[roomId] = updatedRoom;
-      await roomService.updatePlayers(roomId, updatedRoom.players);
-      connectionManager.broadcastToRoom(roomId, 'room.update', updatedRoom.toJson());
-    }
-  }
-
-  Future<void> _destroyRoom(String roomId) async {
-    final engine = activeEngines.remove(roomId);
-    if (engine != null) {
-      _log.info('Disposing JsEngine for room $roomId');
-      engine.dispose();
-    }
-    final room = roomData.remove(roomId);
-    if (room != null) {
-      _log.info('Destroying room ${room.code}');
-      await roomService.updateStatus(roomId, models.RoomStatus.abandoned);
+    for (var event in events) {
+      final payload = jsonDecode(event.payloadJson) as Map<String, dynamic>;
+      final eventPlayerId = payload['_playerId'] as String?;
+      final recoveryPlayer = eventPlayerId != null
+          ? players.firstWhere(
+              (p) => p.id == eventPlayerId,
+              orElse: () => models.Player(id: eventPlayerId, name: 'Recovered', avatar: 'bot'),
+            )
+          : players.isNotEmpty
+              ? players.first
+              : models.Player(id: 'recovery', name: 'System', avatar: 'bot');
+      engine.handleAction(recoveryPlayer, event.type, payload);
     }
   }
 
@@ -1053,86 +477,7 @@ class KernelRuntime {
     roomData.remove(roomId);
     _cleanupTimers.remove(roomId)?.cancel();
     connectionManager.evictRoom(roomId);
-  }
-
-  Future<void> _recordPlayerWin(String gameId, String playerId, String name) async {
-    try {
-      final existingPlayer = await (db.select(db.players)..where((t) => t.id.equals(playerId))).getSingleOrNull();
-      if (existingPlayer == null) {
-        await db.into(db.players).insertOnConflictUpdate(PlayersCompanion.insert(
-          id: playerId,
-          name: name,
-          avatar: 'default',
-          lastSeen: DateTime.now(),
-        ));
-      } else {
-        await db.into(db.players).insertOnConflictUpdate(PlayersCompanion.insert(
-          id: playerId,
-          name: name,
-          avatar: existingPlayer.avatar,
-          lastSeen: DateTime.now(),
-        ));
-      }
-
-      final existingStats = await (db.select(db.gameStats)
-        ..where((t) => t.playerId.equals(playerId) & t.gameId.equals(gameId)))
-        .getSingleOrNull();
-
-      if (existingStats == null) {
-        await db.into(db.gameStats).insert(GameStatsCompanion.insert(
-          playerId: playerId,
-          gameId: gameId,
-          wins: const drift.Value(1),
-          losses: const drift.Value(0),
-        ));
-      } else {
-        await db.into(db.gameStats).insertOnConflictUpdate(GameStatsCompanion.insert(
-          playerId: playerId,
-          gameId: gameId,
-          wins: drift.Value(existingStats.wins + 1),
-          losses: drift.Value(existingStats.losses),
-          totalPoints: drift.Value(existingStats.totalPoints),
-          customStatsJson: drift.Value(existingStats.customStatsJson),
-        ));
-      }
-      logSystemEvent('RECORD_WIN: Player $name ($playerId) won in $gameId. Total wins incremented globally.');
-    } catch (e) {
-      _log.warning('Failed to record player win in DB: $e');
-    }
-  }
-
-  Future<void> _handleGameFinished(models.Room room, Map<String, dynamic> finalState, String winnerId) async {
-    final settings = Map<String, dynamic>.from(room.settings);
-    final leaderboard = Map<String, dynamic>.from(settings['_leaderboard'] ?? {});
-    
-    final winnerPlayer = room.players.firstWhere(
-      (p) => p.id == winnerId,
-      orElse: () => models.Player(id: winnerId, name: 'Unknown', avatar: 'default'),
-    );
-    
-    final currentWins = leaderboard[winnerId] is Map
-        ? (leaderboard[winnerId]['wins'] ?? 0)
-        : (leaderboard[winnerId] ?? 0);
-        
-    leaderboard[winnerId] = {
-      'name': winnerPlayer.name,
-      'wins': currentWins + 1,
-    };
-    settings['_leaderboard'] = leaderboard;
-    
-    await roomService.updateSettings(room.id, settings);
-    
-    final updatedRoom = room.copyWith(
-      settings: settings,
-      publicGameState: finalState,
-    );
-    roomData[room.id] = updatedRoom;
-    
-    await _recordPlayerWin(room.game.id, winnerId, winnerPlayer.name);
-
-    connectionManager.broadcastToRoom(room.id, 'room.update', updatedRoom.toJson());
-    await roomService.updatePublicState(room.id, finalState);
-    connectionManager.broadcastToRoom(room.id, 'game.public_state', finalState);
+    _statsController.add({'activeRooms': roomData.length});
   }
 
   void dispose() {

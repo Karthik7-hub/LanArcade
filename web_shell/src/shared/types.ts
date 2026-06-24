@@ -3,6 +3,7 @@ export interface Player {
   name: string;
   avatar: string;
   isHost: boolean;
+  sessionToken?: string;
   stats?: {
     totalWins: number;
     gameWins: Record<string, number>;

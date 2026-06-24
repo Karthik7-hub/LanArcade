@@ -13,9 +13,16 @@ class DiagnosticsScreen extends StatefulWidget {
 }
 
 class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
+  static final TextStyle _logTextStyle = GoogleFonts.firaCode(
+    fontSize: 12,
+    height: 1.4,
+  );
+
   final List<String> _logs = [];
+  final List<String> _pendingLogs = [];
   String _status = 'OFFLINE';
   StreamSubscription? _subscription;
+  Timer? _logFlushTimer;
 
   @override
   void initState() {
@@ -24,15 +31,39 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     _logs.addAll(widget.kernel.logHistory);
     _subscription = widget.kernel.statsStream.listen((event) {
       if (mounted) {
-        setState(() {
-          if (event.containsKey('status')) {
+        if (event.containsKey('status')) {
+          setState(() {
             _status = event['status'].toString().toUpperCase();
+          });
+        }
+        if (event.containsKey('log')) {
+          _pendingLogs.add(event['log']);
+          _startFlushTimer();
+        }
+      }
+    });
+  }
+
+  void _startFlushTimer() {
+    if (_logFlushTimer != null) return;
+    _logFlushTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_pendingLogs.isNotEmpty) {
+        setState(() {
+          for (final log in _pendingLogs) {
+            _logs.insert(0, log);
           }
-          if (event.containsKey('log')) {
-            _logs.insert(0, event['log']);
-            if (_logs.length > 50) _logs.removeLast();
+          _pendingLogs.clear();
+          if (_logs.length > 50) {
+            _logs.removeRange(50, _logs.length);
           }
         });
+      } else {
+        _logFlushTimer?.cancel();
+        _logFlushTimer = null;
       }
     });
   }
@@ -40,6 +71,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   @override
   void dispose() {
     _subscription?.cancel();
+    _logFlushTimer?.cancel();
     super.dispose();
   }
 
@@ -56,11 +88,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Text(
         log,
-        style: GoogleFonts.firaCode(
-          color: textColor,
-          fontSize: 12,
-          height: 1.4,
-        ),
+        style: _logTextStyle.copyWith(color: textColor),
       ),
     );
   }

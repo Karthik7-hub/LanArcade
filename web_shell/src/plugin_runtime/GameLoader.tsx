@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../shell/store';
-import { ArcadeSDK } from './ArcadeSDK';
+import { wsClient } from '../shell/WebSocketClient';
 
 interface GameLoaderProps {
     onOpenSettings: () => void;
@@ -10,11 +10,66 @@ const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
     const { room } = useStore();
 
     useEffect(() => {
-        return () => {
-            console.log('Cleaning up game sdk subscriptions...');
-            ArcadeSDK.clearSubscriptions();
+        let isReady = false;
+
+        const handleMessage = (event: MessageEvent) => {
+            const iframe = document.getElementById('game-frame') as HTMLIFrameElement | null;
+            if (!iframe || event.source !== iframe.contentWindow) {
+                return;
+            }
+
+            const msg = event.data;
+            if (!msg || typeof msg !== 'object') return;
+
+            switch (msg.type) {
+                case 'arcade:init':
+                    isReady = true;
+                    // Send initial state immediately
+                    sendStateToIframe(iframe, useStore.getState());
+                    break;
+                case 'arcade:action':
+                    wsClient.send('game.action', { type: msg.actionType, data: msg.actionData });
+                    break;
+                case 'arcade:achievement':
+                    wsClient.send('game.action', {
+                        type: 'UNLOCK_ACHIEVEMENT',
+                        data: { achievementId: msg.achievementId }
+                    });
+                    break;
+                case 'arcade:reset':
+                    wsClient.send('room.reset', {});
+                    break;
+            }
         };
-    }, [room?.game.id]);
+
+        const sendStateToIframe = (iframe: HTMLIFrameElement, state: any) => {
+            if (!iframe.contentWindow) return;
+            iframe.contentWindow.postMessage({
+                type: 'arcade:update',
+                room: state.room,
+                player: state.player,
+                publicState: state.publicGameState,
+                privateState: state.privateGameState
+            }, '*');
+        };
+
+        window.addEventListener('message', handleMessage);
+
+        // Subscribe to store changes to push updates to the iframe
+        const unsubscribeStore = useStore.subscribe((state) => {
+            if (isReady) {
+                const iframe = document.getElementById('game-frame') as HTMLIFrameElement | null;
+                if (iframe) {
+                    sendStateToIframe(iframe, state);
+                }
+            }
+        });
+
+        return () => {
+            window.removeEventListener('message', handleMessage);
+            unsubscribeStore();
+        };
+    }, []);
 
     if (!room) return null;
 
@@ -70,7 +125,7 @@ const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
             <iframe
                 id="game-frame"
                 src={gameUrl}
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts"
                 style={{
                     width: '100%',
                     height: '100%',

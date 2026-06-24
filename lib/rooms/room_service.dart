@@ -12,7 +12,18 @@ class RoomService {
 
   Future<models.Room?> createRoom(models.GameManifest game, models.Player host, Map<String, dynamic> settings) async {
     final roomId = DateTime.now().millisecondsSinceEpoch.toString();
-    final code = _generateCode();
+    
+    String code;
+    do {
+      code = _generateCode();
+      final existing = await (db.select(db.rooms)
+            ..where((t) => t.code.equals(code) & t.status.isNotIn([
+                  models.RoomStatus.finished.index,
+                  models.RoomStatus.abandoned.index,
+                ])))
+          .get();
+      if (existing.isEmpty) break;
+    } while (true);
     
     final room = models.Room(
       id: roomId,

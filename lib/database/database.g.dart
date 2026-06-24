@@ -35,6 +35,17 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, DbPlayer> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _sessionTokenMeta = const VerificationMeta(
+    'sessionToken',
+  );
+  @override
+  late final GeneratedColumn<String> sessionToken = GeneratedColumn<String>(
+    'session_token',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lastSeenMeta = const VerificationMeta(
     'lastSeen',
   );
@@ -47,7 +58,13 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, DbPlayer> {
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, avatar, lastSeen];
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    avatar,
+    sessionToken,
+    lastSeen,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -81,6 +98,15 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, DbPlayer> {
     } else if (isInserting) {
       context.missing(_avatarMeta);
     }
+    if (data.containsKey('session_token')) {
+      context.handle(
+        _sessionTokenMeta,
+        sessionToken.isAcceptableOrUnknown(
+          data['session_token']!,
+          _sessionTokenMeta,
+        ),
+      );
+    }
     if (data.containsKey('last_seen')) {
       context.handle(
         _lastSeenMeta,
@@ -110,6 +136,10 @@ class $PlayersTable extends Players with TableInfo<$PlayersTable, DbPlayer> {
         DriftSqlType.string,
         data['${effectivePrefix}avatar'],
       )!,
+      sessionToken: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_token'],
+      ),
       lastSeen: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_seen'],
@@ -127,11 +157,13 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
   final String id;
   final String name;
   final String avatar;
+  final String? sessionToken;
   final DateTime lastSeen;
   const DbPlayer({
     required this.id,
     required this.name,
     required this.avatar,
+    this.sessionToken,
     required this.lastSeen,
   });
   @override
@@ -140,6 +172,9 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['avatar'] = Variable<String>(avatar);
+    if (!nullToAbsent || sessionToken != null) {
+      map['session_token'] = Variable<String>(sessionToken);
+    }
     map['last_seen'] = Variable<DateTime>(lastSeen);
     return map;
   }
@@ -149,6 +184,9 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
       id: Value(id),
       name: Value(name),
       avatar: Value(avatar),
+      sessionToken: sessionToken == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionToken),
       lastSeen: Value(lastSeen),
     );
   }
@@ -162,6 +200,7 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       avatar: serializer.fromJson<String>(json['avatar']),
+      sessionToken: serializer.fromJson<String?>(json['sessionToken']),
       lastSeen: serializer.fromJson<DateTime>(json['lastSeen']),
     );
   }
@@ -172,6 +211,7 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'avatar': serializer.toJson<String>(avatar),
+      'sessionToken': serializer.toJson<String?>(sessionToken),
       'lastSeen': serializer.toJson<DateTime>(lastSeen),
     };
   }
@@ -180,11 +220,13 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
     String? id,
     String? name,
     String? avatar,
+    Value<String?> sessionToken = const Value.absent(),
     DateTime? lastSeen,
   }) => DbPlayer(
     id: id ?? this.id,
     name: name ?? this.name,
     avatar: avatar ?? this.avatar,
+    sessionToken: sessionToken.present ? sessionToken.value : this.sessionToken,
     lastSeen: lastSeen ?? this.lastSeen,
   );
   DbPlayer copyWithCompanion(PlayersCompanion data) {
@@ -192,6 +234,9 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       avatar: data.avatar.present ? data.avatar.value : this.avatar,
+      sessionToken: data.sessionToken.present
+          ? data.sessionToken.value
+          : this.sessionToken,
       lastSeen: data.lastSeen.present ? data.lastSeen.value : this.lastSeen,
     );
   }
@@ -202,13 +247,14 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('avatar: $avatar, ')
+          ..write('sessionToken: $sessionToken, ')
           ..write('lastSeen: $lastSeen')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, avatar, lastSeen);
+  int get hashCode => Object.hash(id, name, avatar, sessionToken, lastSeen);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -216,6 +262,7 @@ class DbPlayer extends DataClass implements Insertable<DbPlayer> {
           other.id == this.id &&
           other.name == this.name &&
           other.avatar == this.avatar &&
+          other.sessionToken == this.sessionToken &&
           other.lastSeen == this.lastSeen);
 }
 
@@ -223,12 +270,14 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
   final Value<String> id;
   final Value<String> name;
   final Value<String> avatar;
+  final Value<String?> sessionToken;
   final Value<DateTime> lastSeen;
   final Value<int> rowid;
   const PlayersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.avatar = const Value.absent(),
+    this.sessionToken = const Value.absent(),
     this.lastSeen = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -236,6 +285,7 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
     required String id,
     required String name,
     required String avatar,
+    this.sessionToken = const Value.absent(),
     required DateTime lastSeen,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -246,6 +296,7 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? avatar,
+    Expression<String>? sessionToken,
     Expression<DateTime>? lastSeen,
     Expression<int>? rowid,
   }) {
@@ -253,6 +304,7 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (avatar != null) 'avatar': avatar,
+      if (sessionToken != null) 'session_token': sessionToken,
       if (lastSeen != null) 'last_seen': lastSeen,
       if (rowid != null) 'rowid': rowid,
     });
@@ -262,6 +314,7 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
     Value<String>? id,
     Value<String>? name,
     Value<String>? avatar,
+    Value<String?>? sessionToken,
     Value<DateTime>? lastSeen,
     Value<int>? rowid,
   }) {
@@ -269,6 +322,7 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
       id: id ?? this.id,
       name: name ?? this.name,
       avatar: avatar ?? this.avatar,
+      sessionToken: sessionToken ?? this.sessionToken,
       lastSeen: lastSeen ?? this.lastSeen,
       rowid: rowid ?? this.rowid,
     );
@@ -286,6 +340,9 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
     if (avatar.present) {
       map['avatar'] = Variable<String>(avatar.value);
     }
+    if (sessionToken.present) {
+      map['session_token'] = Variable<String>(sessionToken.value);
+    }
     if (lastSeen.present) {
       map['last_seen'] = Variable<DateTime>(lastSeen.value);
     }
@@ -301,6 +358,7 @@ class PlayersCompanion extends UpdateCompanion<DbPlayer> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('avatar: $avatar, ')
+          ..write('sessionToken: $sessionToken, ')
           ..write('lastSeen: $lastSeen, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2070,6 +2128,7 @@ typedef $$PlayersTableCreateCompanionBuilder =
       required String id,
       required String name,
       required String avatar,
+      Value<String?> sessionToken,
       required DateTime lastSeen,
       Value<int> rowid,
     });
@@ -2078,6 +2137,7 @@ typedef $$PlayersTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String> avatar,
+      Value<String?> sessionToken,
       Value<DateTime> lastSeen,
       Value<int> rowid,
     });
@@ -2144,6 +2204,11 @@ class $$PlayersTableFilterComposer
 
   ColumnFilters<String> get avatar => $composableBuilder(
     column: $table.avatar,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionToken => $composableBuilder(
+    column: $table.sessionToken,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2227,6 +2292,11 @@ class $$PlayersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sessionToken => $composableBuilder(
+    column: $table.sessionToken,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get lastSeen => $composableBuilder(
     column: $table.lastSeen,
     builder: (column) => ColumnOrderings(column),
@@ -2250,6 +2320,11 @@ class $$PlayersTableAnnotationComposer
 
   GeneratedColumn<String> get avatar =>
       $composableBuilder(column: $table.avatar, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionToken => $composableBuilder(
+    column: $table.sessionToken,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get lastSeen =>
       $composableBuilder(column: $table.lastSeen, builder: (column) => column);
@@ -2336,12 +2411,14 @@ class $$PlayersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> avatar = const Value.absent(),
+                Value<String?> sessionToken = const Value.absent(),
                 Value<DateTime> lastSeen = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PlayersCompanion(
                 id: id,
                 name: name,
                 avatar: avatar,
+                sessionToken: sessionToken,
                 lastSeen: lastSeen,
                 rowid: rowid,
               ),
@@ -2350,12 +2427,14 @@ class $$PlayersTableTableManager
                 required String id,
                 required String name,
                 required String avatar,
+                Value<String?> sessionToken = const Value.absent(),
                 required DateTime lastSeen,
                 Value<int> rowid = const Value.absent(),
               }) => PlayersCompanion.insert(
                 id: id,
                 name: name,
                 avatar: avatar,
+                sessionToken: sessionToken,
                 lastSeen: lastSeen,
                 rowid: rowid,
               ),

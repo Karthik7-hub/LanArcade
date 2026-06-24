@@ -101,6 +101,7 @@ class KernelManager {
       _runtime = null;
       await ForegroundServiceManager.stop();
     }
+    await _db?.close();
     _db = null;
     _addStats({'status': 'stopped', 'log': 'SERVER_STOPPED'});
   }

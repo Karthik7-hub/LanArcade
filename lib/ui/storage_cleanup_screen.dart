@@ -14,6 +14,9 @@ class StorageCleanupScreen extends StatefulWidget {
 }
 
 class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
+  static final TextStyle _firaCodeStyle = GoogleFonts.firaCode();
+  static final TextStyle _plusJakartaSansStyle = GoogleFonts.plusJakartaSans();
+
   bool _isLoading = true;
   Map<String, dynamic> _stats = {};
   List<RoomStorageDetail> _rooms = [];
@@ -334,7 +337,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                 children: [
                   Text(
                     room.code.toUpperCase(),
-                    style: GoogleFonts.firaCode(
+                    style: _firaCodeStyle.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
                       color: ArcadeTheme.primaryColor,
@@ -345,7 +348,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                   Expanded(
                     child: Text(
                       '($gameName)',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: _plusJakartaSansStyle.copyWith(
                         color: ArcadeTheme.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -369,14 +372,14 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                   const SizedBox(width: 4),
                   Text(
                     '${room.playersCount} Players',
-                    style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
+                    style: _plusJakartaSansStyle.copyWith(color: ArcadeTheme.textSecondary, fontSize: 11),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
                 formattedTime,
-                style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
+                style: _plusJakartaSansStyle.copyWith(color: ArcadeTheme.textSecondary, fontSize: 11),
               ),
             ],
           ),
@@ -400,7 +403,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       ),
       child: Text(
         label,
-        style: GoogleFonts.plusJakartaSans(
+        style: _plusJakartaSansStyle.copyWith(
           color: color,
           fontSize: 9,
           fontWeight: FontWeight.w800,

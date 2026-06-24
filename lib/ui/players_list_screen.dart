@@ -25,6 +25,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
   Map<String, Map<String, int>> _playerGameWins = {};
   bool _isLoading = true;
   String? _expandedPlayerId;
+  final Map<String, Widget> _cachedQrWidgets = {};
 
   @override
   void initState() {
@@ -363,17 +364,20 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: QrImageView(
-                                  data: loginUrl,
-                                  version: QrVersions.auto,
-                                  size: 110,
-                                  eyeStyle: const QrEyeStyle(
-                                    eyeShape: QrEyeShape.square,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                  dataModuleStyle: const QrDataModuleStyle(
-                                    dataModuleShape: QrDataModuleShape.square,
-                                    color: Color(0xFF0F172A),
+                                child: _cachedQrWidgets.putIfAbsent(
+                                  player.id,
+                                  () => QrImageView(
+                                    data: loginUrl,
+                                    version: QrVersions.auto,
+                                    size: 110,
+                                    eyeStyle: const QrEyeStyle(
+                                      eyeShape: QrEyeShape.square,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                    dataModuleStyle: const QrDataModuleStyle(
+                                      dataModuleShape: QrDataModuleShape.square,
+                                      color: Color(0xFF0F172A),
+                                    ),
                                   ),
                                 ),
                               ),

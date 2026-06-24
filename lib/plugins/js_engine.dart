@@ -100,6 +100,32 @@ class JsEngine {
         }
       };
     ''');
+    
+    _runtime.evaluate(r'''
+      function _decodeBase64(str) {
+        var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        var output = '';
+        str = str.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+        var i = 0;
+        while (i < str.length) {
+          var enc1 = chars.indexOf(str.charAt(i++));
+          var enc2 = chars.indexOf(str.charAt(i++));
+          var enc3 = chars.indexOf(str.charAt(i++));
+          var enc4 = chars.indexOf(str.charAt(i++));
+          var chr1 = (enc1 << 2) | (enc2 >> 4);
+          var chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+          var chr3 = ((enc3 & 3) << 6) | enc4;
+          output += String.fromCharCode(chr1);
+          if (enc3 != 64) output += String.fromCharCode(chr2);
+          if (enc4 != 64) output += String.fromCharCode(chr3);
+        }
+        try {
+          return decodeURIComponent(escape(output));
+        } catch(e) {
+          return output;
+        }
+      }
+    ''');
   }
 
   Map<String, dynamic> _parseJsArgs(dynamic args) {
@@ -125,16 +151,7 @@ class JsEngine {
     return <String, dynamic>{};
   }
 
-  /// Helper to safely inject JSON into a JS evaluate call.
-  /// Wraps JSON string in single-quotes with proper escaping.
-  String _escapeForJs(String jsonString) {
-    // Escape single quotes and backslashes for JS string literal
-    return jsonString
-        .replaceAll(r'\', r'\\')
-        .replaceAll("'", r"\'")
-        .replaceAll('\n', r'\n')
-        .replaceAll('\r', r'\r');
-  }
+
 
   Future<void> load(String code) async {
     final result = _runtime.evaluate(code);
@@ -175,9 +192,11 @@ class JsEngine {
   }
 
   void init(Map<String, dynamic> settings, List<Player> players) {
-    final playersJson = _escapeForJs(jsonEncode(players.map((p) => p.toJson()).toList()));
-    final settingsJson = _escapeForJs(jsonEncode(settings));
-    final result = _runtime.evaluate("engine.onInit(JSON.parse('$settingsJson'), JSON.parse('$playersJson'))");
+    final playersJson = jsonEncode(players.map((p) => p.toJson()).toList());
+    final settingsJson = jsonEncode(settings);
+    final playersB64 = base64.encode(utf8.encode(playersJson));
+    final settingsB64 = base64.encode(utf8.encode(settingsJson));
+    final result = _runtime.evaluate("engine.onInit(JSON.parse(_decodeBase64('$settingsB64')), JSON.parse(_decodeBase64('$playersB64')))");
     if (result.isError) {
       _log.severe('JS Engine init error: ${result.stringResult}');
     }
@@ -220,17 +239,20 @@ class JsEngine {
   }
 
   void handleAction(Player player, String type, Map<String, dynamic> data) {
-    final playerJson = _escapeForJs(jsonEncode(player.toJson()));
-    final actionJson = _escapeForJs(jsonEncode({'type': type, 'data': data}));
-    final result = _runtime.evaluate("engine.onAction(JSON.parse('$playerJson'), JSON.parse('$actionJson'))");
+    final playerJson = jsonEncode(player.toJson());
+    final actionJson = jsonEncode({'type': type, 'data': data});
+    final playerB64 = base64.encode(utf8.encode(playerJson));
+    final actionB64 = base64.encode(utf8.encode(actionJson));
+    final result = _runtime.evaluate("engine.onAction(JSON.parse(_decodeBase64('$playerB64')), JSON.parse(_decodeBase64('$actionB64')))");
     if (result.isError) {
       _log.severe('JS Engine handleAction error: ${result.stringResult}');
     }
   }
 
   void playerJoined(Player player) {
-    final playerJson = _escapeForJs(jsonEncode(player.toJson()));
-    final result = _runtime.evaluate("engine.onPlayerJoin(JSON.parse('$playerJson'))");
+    final playerJson = jsonEncode(player.toJson());
+    final playerB64 = base64.encode(utf8.encode(playerJson));
+    final result = _runtime.evaluate("engine.onPlayerJoin(JSON.parse(_decodeBase64('$playerB64')))");
     if (result.isError) {
       _log.severe('JS Engine playerJoined error: ${result.stringResult}');
     }
@@ -242,16 +264,18 @@ class JsEngine {
   }
 
   void playerLeft(Player player) {
-    final playerJson = _escapeForJs(jsonEncode(player.toJson()));
-    final result = _runtime.evaluate("engine.onPlayerLeave(JSON.parse('$playerJson'))");
+    final playerJson = jsonEncode(player.toJson());
+    final playerB64 = base64.encode(utf8.encode(playerJson));
+    final result = _runtime.evaluate("engine.onPlayerLeave(JSON.parse(_decodeBase64('$playerB64')))");
     if (result.isError) {
       _log.severe('JS Engine playerLeft error: ${result.stringResult}');
     }
   }
 
   void settingsUpdated(Map<String, dynamic> settings) {
-    final settingsJson = _escapeForJs(jsonEncode(settings));
-    final result = _runtime.evaluate("if (typeof engine.onSettingsUpdate === 'function') { engine.onSettingsUpdate(JSON.parse('$settingsJson')); } else { engine.state.settings = { ...engine.state.settings, ...JSON.parse('$settingsJson') }; }");
+    final settingsJson = jsonEncode(settings);
+    final settingsB64 = base64.encode(utf8.encode(settingsJson));
+    final result = _runtime.evaluate("if (typeof engine.onSettingsUpdate === 'function') { engine.onSettingsUpdate(JSON.parse(_decodeBase64('$settingsB64'))); } else { engine.state.settings = { ...engine.state.settings, ...JSON.parse(_decodeBase64('$settingsB64')) }; }");
     if (result.isError) {
       _log.severe('JS Engine settingsUpdated error: ${result.stringResult}');
     }
@@ -276,6 +300,28 @@ class JsEngine {
     }
     if (_isInitialized && manifest.permissions.contains('timers')) {
       _startTick();
+    }
+  }
+
+  void restoreState(Map<String, dynamic> state) {
+    final stateJson = jsonEncode(state);
+    final stateB64 = base64.encode(utf8.encode(stateJson));
+    final result = _runtime.evaluate('''
+      if (typeof engine !== 'undefined' && engine.state) {
+        var recovered = JSON.parse(_decodeBase64('$stateB64'));
+        for (var key in recovered) {
+          engine.state[key] = recovered[key];
+        }
+        if (typeof recovered.deaths !== 'undefined') {
+          engine.state.teamDeaths = recovered.deaths;
+        }
+        if (typeof engine.sync === 'function') {
+          engine.sync();
+        }
+      }
+    ''');
+    if (result.isError) {
+      _log.severe('JS Engine restoreState error: ${result.stringResult}');
     }
   }
 

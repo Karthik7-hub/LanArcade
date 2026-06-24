@@ -839,8 +839,73 @@
     </div>
 
     <script>
-        // Reference real LAN Arcade SDK from parent context
-        const Arcade = window.parent.Arcade;
+        // Client PostMessage bridge to Parent Shell
+        (function() {
+            var cachedRoom = null;
+            var cachedPlayer = null;
+            var cachedPublicState = null;
+            var cachedPrivateState = null;
+            var updateCallbacks = [];
+
+            window.addEventListener('message', function(event) {
+                var msg = event.data;
+                if (!msg || typeof msg !== 'object') return;
+                
+                if (msg.type === 'arcade:update') {
+                    cachedRoom = msg.room;
+                    cachedPlayer = msg.player;
+                    cachedPublicState = msg.publicState;
+                    cachedPrivateState = msg.privateState;
+                    
+                    for (var i = 0; i < updateCallbacks.length; i++) {
+                        try {
+                            updateCallbacks[i]();
+                        } catch(e) {
+                            console.error("Error in Arcade update callback:", e);
+                        }
+                    }
+                }
+            });
+
+            window.Arcade = {
+                getRoom: function() { return cachedRoom; },
+                getPlayer: function() { return cachedPlayer; },
+                getPublicState: function() { return cachedPublicState; },
+                getPrivateState: function() { return cachedPrivateState; },
+                
+                sendAction: function(type, data) {
+                    window.parent.postMessage({
+                        type: 'arcade:action',
+                        actionType: type,
+                        actionData: data
+                    }, '*');
+                },
+                
+                unlockAchievement: function(achievementId) {
+                    window.parent.postMessage({
+                        type: 'arcade:achievement',
+                        achievementId: achievementId
+                    }, '*');
+                },
+                
+                returnToLobby: function() {
+                    window.parent.postMessage({
+                        type: 'arcade:reset'
+                    }, '*');
+                },
+                
+                onUpdate: function(callback) {
+                    updateCallbacks.push(callback);
+                    return function() {
+                        updateCallbacks = updateCallbacks.filter(function(cb) { return cb !== callback; });
+                    };
+                }
+            };
+
+            window.parent.postMessage({ type: 'arcade:init' }, '*');
+        })();
+
+        const Arcade = window.Arcade;
         if (!Arcade) {
             console.error("Arcade SDK not found. UNO client must be run inside LAN Arcade platform.");
         }
@@ -1787,8 +1852,8 @@
             const redirectBtn = document.getElementById('lobby-redirect-btn');
             if (redirectBtn) {
                 redirectBtn.onclick = () => {
-                    if (window.parent.Arcade && typeof window.parent.Arcade.returnToLobby === 'function') {
-                        window.parent.Arcade.returnToLobby();
+                    if (Arcade && typeof Arcade.returnToLobby === 'function') {
+                        Arcade.returnToLobby();
                     }
                 };
             }

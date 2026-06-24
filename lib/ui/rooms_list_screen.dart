@@ -55,10 +55,33 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
     rooms.sort((a, b) => a.status.name.compareTo(b.status.name));
 
     if (mounted) {
-      setState(() {
-        _rooms = rooms;
+      bool listsAreEqual = _rooms.length == rooms.length;
+      if (listsAreEqual) {
+        for (int i = 0; i < rooms.length; i++) {
+          final rA = _rooms[i];
+          final rB = rooms[i];
+          if (rA.id != rB.id || rA.status != rB.status || rA.hostId != rB.hostId || rA.players.length != rB.players.length) {
+            listsAreEqual = false;
+            break;
+          }
+          for (int j = 0; j < rA.players.length; j++) {
+            if (rA.players[j].id != rB.players[j].id || rA.players[j].name != rB.players[j].name || rA.players[j].avatar != rB.players[j].avatar) {
+              listsAreEqual = false;
+              break;
+            }
+          }
+          if (!listsAreEqual) break;
+        }
+      }
+
+      if (!listsAreEqual || !silent) {
+        setState(() {
+          _rooms = rooms;
+          _isLoading = false;
+        });
+      } else {
         _isLoading = false;
-      });
+      }
     }
   }
 

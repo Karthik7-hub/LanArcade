@@ -30,33 +30,39 @@ class ForegroundService : Service() {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             )
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        // Acquire CPU WakeLock
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LanArcade::ServerWakeLock").apply {
-            acquire()
+        // Acquire CPU WakeLock if not already held
+        if (wakeLock == null) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LanArcade::ServerWakeLock").apply {
+                acquire()
+            }
         }
 
-        // Acquire WifiLock
+        // Acquire WifiLock if not already held
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        wifiLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "LanArcade::ServerWifiLock")
-        } else {
-            @Suppress("DEPRECATION")
-            wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LanArcade::ServerWifiLock")
-        }.apply {
-            acquire()
+        if (wifiLock == null) {
+            wifiLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "LanArcade::ServerWifiLock")
+            } else {
+                @Suppress("DEPRECATION")
+                wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL, "LanArcade::ServerWifiLock")
+            }.apply {
+                acquire()
+            }
         }
 
-        // Acquire MulticastLock to ensure mDNS requests are received in background
-        multicastLock = wifiManager.createMulticastLock("LanArcade::MulticastLock").apply {
-            setReferenceCounted(true)
-            acquire()
+        // Acquire MulticastLock if not already held to ensure mDNS requests are received in background
+        if (multicastLock == null) {
+            multicastLock = wifiManager.createMulticastLock("LanArcade::MulticastLock").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
         }
 
         return START_NOT_STICKY
