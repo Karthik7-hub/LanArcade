@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../shell/store';
 import { wsClient } from '../shell/WebSocketClient';
+import { HapticManager } from './HapticManager';
 
 interface GameLoaderProps {
     onOpenSettings: () => void;
@@ -38,6 +39,13 @@ const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
                     break;
                 case 'arcade:reset':
                     wsClient.send('room.reset', {});
+                    break;
+                case 'arcade:haptic':
+                    if (room?.game?.supportsHaptics) {
+                        HapticManager.trigger(msg.hapticType, true);
+                    } else {
+                        console.warn(`[Haptics] Game "${room?.game?.name}" requested haptic "${msg.hapticType}" but supportsHaptics is false/missing in manifest.`);
+                    }
                     break;
             }
         };

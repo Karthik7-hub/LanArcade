@@ -35,6 +35,8 @@ GameManifest _$GameManifestFromJson(Map<String, dynamic> json) => GameManifest(
   thumbnail: json['thumbnail'] as String?,
   settingsSchema: json['settingsSchema'] as Map<String, dynamic>?,
   description: json['description'] as String?,
+  supportsHaptics: json['supportsHaptics'] as bool?,
+  hapticProfile: json['hapticProfile'] as String?,
 );
 
 Map<String, dynamic> _$GameManifestToJson(GameManifest instance) =>
@@ -51,6 +53,8 @@ Map<String, dynamic> _$GameManifestToJson(GameManifest instance) =>
       'thumbnail': instance.thumbnail,
       'settingsSchema': instance.settingsSchema,
       'description': instance.description,
+      'supportsHaptics': instance.supportsHaptics,
+      'hapticProfile': instance.hapticProfile,
     };
 
 Room _$RoomFromJson(Map<String, dynamic> json) => Room(

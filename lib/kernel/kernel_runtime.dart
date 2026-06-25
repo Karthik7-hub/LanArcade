@@ -13,6 +13,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:logging/logging.dart';
 
 import 'connection_manager.dart';
+import 'kernel_manager.dart';
 import '../rooms/room_service.dart';
 import '../database/database.dart';
 import '../shared/models.dart' as models;
@@ -263,14 +264,14 @@ class KernelRuntime implements KernelContext {
         const Pipeline().addMiddleware(logRequests()).addHandler(cascade.handler);
 
     try {
-      _server = await io.serve(handler, '0.0.0.0', 8080);
+      _server = await io.serve(handler, '0.0.0.0', KernelManager.serverPort);
       _isRunning = true;
       _statsController.add({
         'status': 'running',
-        'log': 'SERVER_STARTED on 0.0.0.0:8080',
+        'log': 'SERVER_STARTED on 0.0.0.0:${KernelManager.serverPort}',
         'address': _server!.address.address,
         'port': _server!.port,
-        'bind': '0.0.0.0:8080',
+        'bind': '0.0.0.0:${KernelManager.serverPort}',
       });
     } catch (e) {
       _statsController.add({
@@ -320,12 +321,6 @@ class KernelRuntime implements KernelContext {
       _log.warning('Error closing HTTP server: $e');
     }
 
-    // Close the database to prevent SQLite file descriptor leak
-    try {
-      await db.close();
-    } catch (e) {
-      _log.warning('Error closing database: $e');
-    }
 
     _isRunning = false;
     _statsController.add({'status': 'stopped', 'log': 'SERVER_STOPPED'});

@@ -48,6 +48,8 @@ class GameManifest {
   final String? thumbnail;
   final Map<String, dynamic>? settingsSchema;
   final String? description;
+  final bool? supportsHaptics;
+  final String? hapticProfile;
 
   GameManifest({
     required this.id,
@@ -62,6 +64,8 @@ class GameManifest {
     this.thumbnail,
     this.settingsSchema,
     this.description,
+    this.supportsHaptics,
+    this.hapticProfile,
   });
 
   factory GameManifest.fromJson(Map<String, dynamic> json) => _$GameManifestFromJson(json);

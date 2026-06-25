@@ -1,11 +1,16 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:nsd/nsd.dart';
+import '../kernel/kernel_manager.dart';
 
 class DiscoveryService {
+  static final DiscoveryService _instance = DiscoveryService._internal();
+  factory DiscoveryService() => _instance;
+  DiscoveryService._internal();
+
   Registration? _registration;
   String _currentName = "Main Arcade";
-  int _currentPort = 8080;
+  int _currentPort = KernelManager.serverPort;
   int _currentPlayers = 0;
   bool _isRegistering = false;
   bool _pendingUpdate = false;

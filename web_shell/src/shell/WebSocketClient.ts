@@ -69,9 +69,13 @@ class WebSocketClient {
     };
 
     this.socket.onmessage = (event) => {
-      const data: PlatformEvent = JSON.parse(event.data);
-      useStore.getState().addDebugLog(`← IN: ${data.type}`);
-      this.handleEvent(data);
+      try {
+        const data: PlatformEvent = JSON.parse(event.data);
+        useStore.getState().addDebugLog(`← IN: ${data.type}`);
+        this.handleEvent(data);
+      } catch (err) {
+        console.error('Failed to parse incoming WebSocket message:', err, event.data);
+      }
     };
 
     this.socket.onclose = () => {

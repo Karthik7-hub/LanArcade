@@ -75,7 +75,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ availableGames, onOpenSettings 
                 id="home-room-code-input"
                 type="text"
                 value={roomCodeInput}
-                onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+                onChange={(e) => setRoomCodeInput(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
                 placeholder="Enter Room Code"
                 className="home-join-input"

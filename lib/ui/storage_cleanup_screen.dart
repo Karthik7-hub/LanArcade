@@ -275,15 +275,13 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               ),
             )
           else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _rooms.length,
-              separatorBuilder: (context, index) => const Divider(height: 20),
-              itemBuilder: (context, index) {
-                final room = _rooms[index];
-                return _buildRoomRow(room);
-              },
+            Column(
+              children: [
+                for (int i = 0; i < _rooms.length; i++) ...[
+                  _buildRoomRow(_rooms[i]),
+                  if (i < _rooms.length - 1) const Divider(height: 20),
+                ]
+              ],
             ),
         ],
       ),

@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../kernel/kernel_manager.dart';
 import '../discovery/discovery_service.dart';
+import '../shared/haptic_manager.dart';
 import 'diagnostics_screen.dart';
 import 'storage_cleanup_screen.dart';
 import 'theme.dart';
@@ -38,11 +39,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget? _cachedQrWidget;
   String? _cachedQrUrl;
 
+  Future<String> _getIpAddress() async {
+    try {
+      final interfaces = await NetworkInterface.list();
+      for (var interface in interfaces) {
+        for (var addr in interface.addresses) {
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+            return addr.address;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Interface scanning failed: $e");
+    }
+    return "127.0.0.1";
+  }
+
   @override
   void initState() {
     super.initState();
     _isRunning = _kernel.status == 'RUNNING';
     _activeRoomsCount = _kernel.activeRoomsCount;
+    if (_isRunning) {
+      _getIpAddress().then((ip) {
+        if (mounted) {
+          setState(() {
+            _ipAddress = ip;
+          });
+        }
+      });
+    }
     _subscription = _kernel.statsStream.listen((event) {
       if (mounted) {
         if (event.containsKey('status') ||
@@ -79,8 +105,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void dispose() {
     _subscription?.cancel();
-    _kernel.dispose();
-    _discovery.stop();
     super.dispose();
   }
 
@@ -143,24 +167,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     } else {
       await _requestPermissions();
       await _kernel.start();
-      String? ip;
+      final ip = await _getIpAddress();
       try {
-        final interfaces = await NetworkInterface.list();
-        for (var interface in interfaces) {
-          for (var addr in interface.addresses) {
-            if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-              ip = addr.address;
-              break;
-            }
-          }
-          if (ip != null) break;
-        }
-      } catch (e) {
-        debugPrint("Interface scanning failed: $e");
-      }
-      ip ??= "127.0.0.1";
-      try {
-        await _discovery.start("Main Arcade", 8080);
+        await _discovery.start("Main Arcade", KernelManager.serverPort);
       } catch (e) {
         debugPrint("Discovery failed: $e");
       }
@@ -259,20 +268,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _isRunning ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
-            ),
-          ).animate(
-            onPlay: (controller) {
-              if (!Platform.environment.containsKey('FLUTTER_TEST')) {
-                controller.repeat(reverse: true);
-              }
-            },
-          ).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 1.seconds),
+          _isRunning
+              ? Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ArcadeTheme.successColor,
+                  ),
+                ).animate(
+                  onPlay: (controller) {
+                    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+                      controller.repeat(reverse: true);
+                    }
+                  },
+                ).scale(
+                  begin: const Offset(0.8, 0.8),
+                  end: const Offset(1.2, 1.2),
+                  duration: 1.seconds,
+                )
+              : Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ArcadeTheme.errorColor,
+                  ),
+                ),
           const SizedBox(width: 6),
           Text(
             _isRunning ? 'LIVE' : 'OFFLINE',
@@ -446,7 +468,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildNetworkCard() {
-    final String serverUrl = "http://${_ipAddress ?? '0.0.0.0'}:8080";
+    final String serverUrl = "http://${_ipAddress ?? '0.0.0.0'}:${KernelManager.serverPort}";
     
     if (_cachedQrWidget == null || _cachedQrUrl != serverUrl) {
       _cachedQrUrl = serverUrl;
@@ -681,70 +703,69 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             )
           else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: games.length,
-              separatorBuilder: (context, index) => Divider(color: Colors.white.withValues(alpha: 0.05), height: 20),
-              itemBuilder: (context, index) {
-                final game = games[index];
-                return Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.sports_esports_rounded,
-                        color: ArcadeTheme.textPrimary,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            game.name,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: ArcadeTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Version ${game.version} • by ${game.author}',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              color: ArcadeTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${game.minPlayers}-${game.maxPlayers}P',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+            Column(
+              children: [
+                for (int i = 0; i < games.length; i++) ...[
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.sports_esports_rounded,
                           color: ArcadeTheme.textPrimary,
+                          size: 22,
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              games[i].name,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: ArcadeTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Version ${games[i].version} • by ${games[i].author}',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                color: ArcadeTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${games[i].minPlayers}-${games[i].maxPlayers}P',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: ArcadeTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (i < games.length - 1)
+                    Divider(color: Colors.white.withValues(alpha: 0.05), height: 20),
+                ]
+              ],
             ),
         ],
       ),
@@ -770,7 +791,10 @@ class _ScalePressButtonState extends State<ScalePressButton> {
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) => setState(() => _isPressed = false),
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
+      onTap: () {
+        HapticManager.trigger('button');
+        widget.onTap();
+      },
       child: AnimatedScale(
         scale: _isPressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 100),

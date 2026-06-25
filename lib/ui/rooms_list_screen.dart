@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../kernel/kernel_manager.dart';
 import '../shared/models.dart';
+import '../shared/haptic_manager.dart';
 import 'theme.dart';
 
 class RoomsListScreen extends StatefulWidget {
@@ -112,6 +113,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
 
     if (confirm != true) return;
 
+    HapticManager.trigger('error');
     try {
       await widget.kernel.deleteRoom(room.id);
       _loadRooms();
@@ -357,7 +359,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                 const SizedBox(width: 10),
                                 InkWell(
                                   onTap: () {
-                                    final joinUrl = 'http://${widget.ipAddress}:8080/?room=${room.code}';
+                                    final joinUrl = 'http://${widget.ipAddress}:${KernelManager.serverPort}/?room=${room.code}';
                                     Clipboard.setData(ClipboardData(text: joinUrl));
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -374,9 +376,9 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                       ),
                                     );
                                   },
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(6),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [

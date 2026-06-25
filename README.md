@@ -46,6 +46,15 @@ Vite's build tool will automatically clear `assets/shell` and replace it with th
 
 ---
 
+## 📳 Haptic Feedback (Vibration) Support
+
+The platform features an integrated haptic feedback engine to enhance player immersion:
+* **Web Client Haptics (`web_shell/src/plugin_runtime/HapticManager.ts`)**: Supports custom vibration patterns for button clicks, card plays, card draws, player join/leave events, achievements, wins, and losses.
+* **Haptic Customization**: Players can toggle haptics on/off, customize system vs. game haptics, and choose vibration intensities (`soft`, `normal`, `strong`) via the settings menu in the Web Shell.
+* **Native Host Haptics (`lib/shared/haptic_manager.dart`)**: Translates game events into native platform haptic feedback (`lightImpact`, `mediumImpact`, `heavyImpact`) on supporting Android/iOS host devices.
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites

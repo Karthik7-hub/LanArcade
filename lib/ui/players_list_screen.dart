@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../database/database.dart';
+import '../kernel/kernel_manager.dart';
+import '../shared/haptic_manager.dart';
 import 'theme.dart';
 
 class PlayersListScreen extends StatefulWidget {
@@ -70,6 +72,92 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load players: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _deletePlayer(String playerId) async {
+    await widget.database.transaction(() async {
+      // 1. Delete Achievements
+      await (widget.database.delete(widget.database.achievements)
+            ..where((t) => t.playerId.equals(playerId)))
+          .go();
+      
+      // 2. Delete GameStats
+      await (widget.database.delete(widget.database.gameStats)
+            ..where((t) => t.playerId.equals(playerId)))
+          .go();
+      
+      // 3. Delete Player
+      await (widget.database.delete(widget.database.players)
+            ..where((t) => t.id.equals(playerId)))
+          .go();
+    });
+  }
+
+  Future<void> _confirmDeletePlayer(DbPlayer player) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'DELETE PLAYER?',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${player.name}? All stats, wins, and achievements will be permanently deleted.',
+          style: GoogleFonts.plusJakartaSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ArcadeTheme.errorColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('DELETE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      HapticManager.trigger('error');
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        await _deletePlayer(player.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.delete_rounded, color: ArcadeTheme.errorColor, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Player ${player.name} deleted successfully.'),
+                ],
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: ArcadeTheme.cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+          _expandedPlayerId = null;
+          await _loadPlayersData();
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete player: $e')),
+          );
+        }
       }
     }
   }
@@ -213,7 +301,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
         final totalWins = _playerTotalWins[player.id] ?? 0;
         final isExpanded = _expandedPlayerId == player.id;
         final avatarColor = _resolveAvatarColor(player.avatar);
-        final loginUrl = 'http://${widget.ipAddress}:8080/?login_id=${player.id}';
+        final loginUrl = 'http://${widget.ipAddress}:${KernelManager.serverPort}/?login_id=${player.id}';
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -396,15 +484,37 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // Stats breakdown
-                      Text(
-                        'WINS BY GAME',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: ArcadeTheme.textSecondary,
-                          letterSpacing: 0.8,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'WINS BY GAME',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: ArcadeTheme.textSecondary,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => _confirmDeletePlayer(player),
+                            icon: const Icon(Icons.delete_outline_rounded, color: ArcadeTheme.errorColor, size: 16),
+                            label: Text(
+                              'DELETE PLAYER',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: ArcadeTheme.errorColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              backgroundColor: ArcadeTheme.errorColor.withValues(alpha: 0.08),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       _buildGameWinsBreakdown(player.id),
@@ -459,11 +569,11 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.copy_rounded, size: 16, color: Colors.white54),
+                icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.white54),
                 onPressed: onCopy,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                splashRadius: 18,
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                splashRadius: 22,
               ),
             ],
           ),

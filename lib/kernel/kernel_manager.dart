@@ -15,6 +15,12 @@ import '../plugins/plugin_manager.dart';
 import '../shared/models.dart';
 
 class KernelManager {
+  static const int serverPort = 8080;
+
+  static final KernelManager _instance = KernelManager._internal();
+  factory KernelManager() => _instance;
+  KernelManager._internal();
+
   KernelRuntime? _runtime;
   AppDatabase? _db;
   Timer? _autoCleanupTimer;

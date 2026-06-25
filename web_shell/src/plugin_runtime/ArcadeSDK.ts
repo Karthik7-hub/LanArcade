@@ -1,5 +1,6 @@
 import { useStore } from '../shell/store';
 import { wsClient } from '../shell/WebSocketClient';
+import { HapticManager } from './HapticManager';
 
 let activeSubscriptions: (() => void)[] = [];
 
@@ -21,6 +22,12 @@ export const ArcadeSDK = {
             type: 'UNLOCK_ACHIEVEMENT',
             data: { achievementId }
         });
+    },
+
+    haptics: {
+        trigger: (type: string) => {
+            HapticManager.trigger(type, true);
+        }
     },
 
     returnToLobby: () => {

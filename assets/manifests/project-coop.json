@@ -5,6 +5,8 @@
   "sdkVersion": "1.0.0",
   "author": "LAN Arcade",
   "description": "A cooperative puzzle platformer where teamwork is the only way to win.",
+  "supportsHaptics": true,
+  "hapticProfile": "platformer",
   "entry": "index.html",
   "minPlayers": 2,
   "maxPlayers": 8,

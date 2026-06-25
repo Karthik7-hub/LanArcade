@@ -158,8 +158,8 @@ const LoginScreen: React.FC = () => {
                       className={`avatar-color-circle ${selectedAvatar === c ? 'active' : ''}`}
                       style={{
                         backgroundColor: resolveAvatarColor(c),
-                        width: '32px',
-                        height: '32px',
+                        width: '44px',
+                        height: '44px',
                         borderRadius: '50%',
                         border: selectedAvatar === c ? '2.5px solid #fff' : '2.5px solid transparent',
                         cursor: 'pointer',

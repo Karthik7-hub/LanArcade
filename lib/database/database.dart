@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../shared/models.dart';
 
 part 'database.g.dart';
@@ -105,6 +106,9 @@ class AppDatabase extends _$AppDatabase {
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
+    if (kIsWeb) {
+      throw UnsupportedError('Drift native sqlite is not supported on Web.');
+    }
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'arcade.sqlite'));
     return NativeDatabase(file, setup: (rawDb) {

@@ -628,7 +628,7 @@ test('UNO - Triple WildDrawFour Stacking with Finisher', () => {
     console.log("FINISHER TEST - Charlie hand size:", engine.state.hands['player3'] ? engine.state.hands['player3'].length : 'undefined/deleted');
 });
 
-test('UNO - Stacking Combinations (+2 on +4 and +4 on +2)', () => {
+test('UNO - Stacking Combinations Disallowed (+2 on +4 and +4 on +2)', () => {
     const engine = loadEngine('assets/engines/uno.js');
     const players = [
         { id: 'player1', name: 'Alice' },
@@ -652,20 +652,33 @@ test('UNO - Stacking Combinations (+2 on +4 and +4 on +2)', () => {
     assert.strictEqual(engine.state.drawPending, 4);
     assert.strictEqual(engine.state.currentPlayerIndex, 1); // Bob's turn
 
-    // 2. Bob stacks Blue DrawTwo on WildDrawFour (different color, different value type!)
+    // 2. Bob tries to stack Blue DrawTwo on WildDrawFour - SHOULD BE DISALLOWED
     engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'PLAY_CARD', data: { cardIndex: 0 } });
-    assert.strictEqual(engine.state.drawPending, 6);
+    assert.strictEqual(engine.state.drawPending, 4, 'drawPending should remain 4 since stack was disallowed');
+    assert.strictEqual(engine.state.currentPlayerIndex, 1, 'Turn should remain Bob\'s turn');
+
+    // 3. Bob draws cards (drawPending is 4)
+    engine.onAction({ id: 'player2', name: 'Bob' }, { type: 'DRAW_CARD', data: {} });
+    assert.strictEqual(engine.state.drawPending, 0);
     assert.strictEqual(engine.state.currentPlayerIndex, 2); // Charlie's turn
 
-    // 3. Charlie stacks WildDrawFour on DrawTwo
+    // 4. Charlie plays +4
     engine.onAction({ id: 'player3', name: 'Charlie' }, { type: 'PLAY_CARD', data: { cardIndex: 0, chosenColor: 'Red' } });
-    assert.strictEqual(engine.state.drawPending, 10);
+    assert.strictEqual(engine.state.drawPending, 4);
     assert.strictEqual(engine.state.currentPlayerIndex, 0); // Alice's turn
 
-    // 4. Alice draws penalty
+    // 5. Alice tries to stack +2 (we give Alice a +2 to check if she can stack it on +4)
+    engine.state.hands['player1'].push({ color: 'Red', value: 'DrawTwo' });
+    const p1DrawTwoIdx = engine.state.hands['player1'].length - 1;
+    // Alice tries to stack DrawTwo on WildDrawFour - SHOULD BE DISALLOWED
+    engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'PLAY_CARD', data: { cardIndex: p1DrawTwoIdx } });
+    assert.strictEqual(engine.state.drawPending, 4, 'drawPending should remain 4');
+    assert.strictEqual(engine.state.currentPlayerIndex, 0, 'Turn should remain Alice\'s turn');
+
+    // 6. Alice draws penalty (drawPending is 4)
     const handSizeBefore = engine.state.hands['player1'].length;
     engine.onAction({ id: 'player1', name: 'Alice' }, { type: 'DRAW_CARD', data: {} });
-    assert.strictEqual(engine.state.hands['player1'].length, handSizeBefore + 10);
+    assert.strictEqual(engine.state.hands['player1'].length, handSizeBefore + 4);
     assert.strictEqual(engine.state.drawPending, 0);
 });
 

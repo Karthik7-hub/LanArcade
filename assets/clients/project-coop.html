@@ -144,6 +144,15 @@
                     }, '*');
                 },
                 
+                haptics: {
+                    trigger: function(type) {
+                        window.parent.postMessage({
+                            type: 'arcade:haptic',
+                            hapticType: type
+                        }, '*');
+                    }
+                },
+                
                 returnToLobby: function() {
                     window.parent.postMessage({
                         type: 'arcade:reset'
@@ -171,6 +180,13 @@
         let lastKeys = { left: false, right: false, jump: false };
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
+        let lastState = {
+            levelId: null,
+            status: null,
+            players: {},
+            entities: {}
+        };
+
         function init() {
             window.addEventListener('resize', resize);
             resize();
@@ -197,6 +213,59 @@
                 if (snapshot) {
                     const levelType = snapshot.settings && snapshot.settings.levelType === 'procedural' ? 'PROCEDURAL ' : '';
                     document.getElementById('level-indicator').innerText = levelType + 'LEVEL ' + snapshot.levelId;
+
+                    // Centralized Gameplay Haptic triggers
+                    if (lastState.levelId !== null) {
+                        // 1. Level Complete / Win
+                        if (snapshot.levelId > lastState.levelId || (snapshot.status === 'win' && lastState.status !== 'win')) {
+                            if (Arcade.haptics) Arcade.haptics.trigger('win');
+                        }
+
+                        // 2. Door opens / Switch pressed
+                        if (snapshot.entities && lastState.entities) {
+                            snapshot.entities.forEach(e => {
+                                const prevE = lastState.entities[e.id];
+                                if (prevE) {
+                                    if (e.type === 'door' && prevE.locked && !e.locked) {
+                                        if (Arcade.haptics) Arcade.haptics.trigger('success'); // Door opens -> Soft Confirmation
+                                    }
+                                    if (e.type === 'switch' && !prevE.pressed && e.pressed) {
+                                        if (Arcade.haptics) Arcade.haptics.trigger('button'); // Button activated -> Small Tick
+                                    }
+                                }
+                            });
+                        }
+
+                        // 3. Fall/Death or Respawn Check
+                        if (player && snapshot.players && lastState.players) {
+                            const p = snapshot.players[player.id];
+                            const prevP = lastState.players[player.id];
+                            if (p && prevP) {
+                                if (!prevP.isDead && p.isDead) {
+                                    if (Arcade.haptics) Arcade.haptics.trigger('lose'); // Fall/Death -> Small Bump
+                                }
+                                if (prevP.isDead && !p.isDead) {
+                                    if (Arcade.haptics) Arcade.haptics.trigger('checkpoint'); // Respawn / start -> Soft Tap
+                                }
+                            }
+                        }
+                    }
+
+                    // Save state for comparison next frame
+                    lastState.levelId = snapshot.levelId;
+                    lastState.status = snapshot.status;
+                    lastState.players = {};
+                    if (snapshot.players) {
+                        for (let id in snapshot.players) {
+                            lastState.players[id] = { ...snapshot.players[id] };
+                        }
+                    }
+                    lastState.entities = {};
+                    if (snapshot.entities) {
+                        snapshot.entities.forEach(e => {
+                            lastState.entities[e.id] = { ...e };
+                        });
+                    }
                 }
             });
         }

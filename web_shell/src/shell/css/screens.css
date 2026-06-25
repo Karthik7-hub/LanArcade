@@ -997,3 +997,36 @@
   height: var(--logo-size-small);
   object-fit: contain;
 }
+
+@media (max-width: 767px) {
+  .identity-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(13, 16, 26, 0.95) !important;
+  }
+  .home-left-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(11, 15, 26, 0.95) !important;
+  }
+  .home-profile-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(20, 26, 43, 0.9) !important;
+  }
+  .home-join-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(20, 26, 43, 0.9) !important;
+  }
+  .home-right-header {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+  }
+  .waiting-container {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(13, 16, 26, 0.95) !important;
+  }
+}

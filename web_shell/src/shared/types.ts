@@ -23,6 +23,8 @@ export interface GameManifest {
   thumbnail?: string;
   settingsSchema?: Record<string, any>;
   description?: string;
+  supportsHaptics?: boolean;
+  hapticProfile?: string;
 }
 
 export type RoomStatus = 'waiting' | 'active' | 'finished';

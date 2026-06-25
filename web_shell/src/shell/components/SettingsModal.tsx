@@ -34,6 +34,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     textScaling, setTextScaling,
     currentTheme, setCurrentTheme,
     mockPing,
+    hapticsEnabled, setHapticsEnabled,
+    hapticIntensity, setHapticIntensity,
+    gameHaptics, setGameHaptics,
+    systemHaptics, setSystemHaptics,
   } = useSettings();
 
   const { isFullscreen, toggleFullscreen, attemptFullscreen } = useFullscreen();
@@ -103,7 +107,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const categoriesList = [
     { id: 'gameplay', name: 'Gameplay', icon: <Gamepad2 size={16} /> },
-    { id: 'audio', name: 'Audio', icon: <Volume2 size={16} /> },
+    { id: 'audio', name: 'Audio & Haptics', icon: <Volume2 size={16} /> },
     { id: 'display', name: 'Display', icon: <Maximize2 size={16} /> },
     { id: 'network', name: 'Network', icon: <Wifi size={16} /> },
     { id: 'storage', name: 'Storage', icon: <Database size={16} /> },
@@ -198,7 +202,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {activeTab === 'audio' && (
               <div className="settings-content-pane">
-                <h4 className="pane-title">AUDIO SETTINGS</h4>
+                <h4 className="pane-title">AUDIO & HAPTICS SETTINGS</h4>
                 <div className="pane-control-card">
                   <div className="pane-control-label">
                     <strong>Sound Effects</strong>
@@ -227,6 +231,68 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="pane-slider"
                     />
                   </div>
+                </div>
+
+                <div style={{ margin: '16px 0 8px 0', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Haptic Feedback</span>
+                </div>
+
+                <div className="pane-control-card">
+                  <div className="pane-control-label">
+                    <strong>Enable Haptics</strong>
+                    <p>Vibrate device on key platform and game actions</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={hapticsEnabled}
+                    onChange={() => setHapticsEnabled((prev) => !prev)}
+                    className="pane-checkbox"
+                  />
+                </div>
+
+                <div className="pane-control-card">
+                  <div className="pane-control-label">
+                    <strong>Intensity</strong>
+                    <p>Adjust the strength of vibration taps</p>
+                  </div>
+                  <select
+                    value={hapticIntensity}
+                    onChange={(e) => setHapticIntensity(e.target.value as any)}
+                    className="pane-select"
+                    disabled={!hapticsEnabled}
+                  >
+                    <option value="soft">SOFT</option>
+                    <option value="normal">NORMAL</option>
+                    <option value="strong">STRONG</option>
+                  </select>
+                </div>
+
+                <div className="pane-control-card">
+                  <div className="pane-control-label">
+                    <strong>Game Haptics</strong>
+                    <p>Allow games to trigger gameplay haptics</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={gameHaptics}
+                    onChange={() => setGameHaptics((prev) => !prev)}
+                    className="pane-checkbox"
+                    disabled={!hapticsEnabled}
+                  />
+                </div>
+
+                <div className="pane-control-card">
+                  <div className="pane-control-label">
+                    <strong>System Haptics</strong>
+                    <p>Vibrate on dashboard, lobbies, and UI transitions</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={systemHaptics}
+                    onChange={() => setSystemHaptics((prev) => !prev)}
+                    className="pane-checkbox"
+                    disabled={!hapticsEnabled}
+                  />
                 </div>
               </div>
             )}
@@ -305,10 +371,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         className={`avatar-color-circle ${editColor === c ? 'active' : ''}`}
                         style={{
                           backgroundColor: resolveAvatarColor(c),
-                          width: 24,
-                          height: 24,
+                          width: 44,
+                          height: 44,
                           borderRadius: '50%',
-                          border: editColor === c ? '2px solid #fff' : '2px solid transparent',
+                          border: editColor === c ? '2.5px solid #fff' : '2.5px solid transparent',
                           cursor: 'pointer',
                         }}
                       />

@@ -1,5 +1,6 @@
 import 'message_handler.dart';
 import '../../database/database.dart';
+import 'package:drift/drift.dart';
 import '../../shared/models.dart' as models;
 
 /// Handles `game.action` — START, UNLOCK_ACHIEVEMENT, and generic game actions.
@@ -46,7 +47,7 @@ class GameActionHandler extends MessageHandler {
               gameId: engine.manifest.id,
               achievementId: aid,
               unlockedAt: DateTime.now(),
-            ));
+            ), mode: InsertMode.insertOrIgnore);
         ctx.connectionManager.broadcastToRoom(
             connection.roomId!, 'game.achievement_unlocked', {
           'playerId': connection.player!.id,

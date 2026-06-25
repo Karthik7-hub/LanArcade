@@ -11,10 +11,12 @@ class Connection {
   Connection(this.id, this.socket);
 
   void send(String type, dynamic payload) {
-    socket.sink.add(jsonEncode({
-      'type': type,
-      'payload': payload,
-    }));
+    try {
+      socket.sink.add(jsonEncode({
+        'type': type,
+        'payload': payload,
+      }));
+    } catch (_) {}
   }
 
   void close() {

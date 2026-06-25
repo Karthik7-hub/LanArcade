@@ -8,6 +8,10 @@ interface SettingsState {
   textScaling: 'normal' | 'large';
   currentTheme: string;
   mockPing: number;
+  hapticsEnabled: boolean;
+  hapticIntensity: 'soft' | 'normal' | 'strong';
+  gameHaptics: boolean;
+  systemHaptics: boolean;
 
   setSoundEffects: (val: boolean | ((prev: boolean) => boolean)) => void;
   setSoundVolume: (val: number | ((prev: number) => number)) => void;
@@ -15,6 +19,10 @@ interface SettingsState {
   setTextScaling: (val: ('normal' | 'large') | ((prev: 'normal' | 'large') => 'normal' | 'large')) => void;
   setCurrentTheme: (val: string | ((prev: string) => string)) => void;
   setMockPing: (ping: number) => void;
+  setHapticsEnabled: (val: boolean | ((prev: boolean) => boolean)) => void;
+  setHapticIntensity: (val: ('soft' | 'normal' | 'strong') | ((prev: 'soft' | 'normal' | 'strong') => 'soft' | 'normal' | 'strong')) => void;
+  setGameHaptics: (val: boolean | ((prev: boolean) => boolean)) => void;
+  setSystemHaptics: (val: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 const useSettingsStore = create<SettingsState>((set) => ({
@@ -24,6 +32,10 @@ const useSettingsStore = create<SettingsState>((set) => ({
   textScaling: (localStorage.getItem('textScaling') as 'normal' | 'large') ?? 'normal',
   currentTheme: localStorage.getItem('uiTheme') ?? 'slate',
   mockPing: 42,
+  hapticsEnabled: localStorage.getItem('hapticsEnabled') !== 'false',
+  hapticIntensity: (localStorage.getItem('hapticIntensity') as 'soft' | 'normal' | 'strong') ?? 'normal',
+  gameHaptics: localStorage.getItem('gameHaptics') !== 'false',
+  systemHaptics: localStorage.getItem('systemHaptics') !== 'false',
 
   setSoundEffects: (val) => {
     set((state) => {
@@ -68,6 +80,34 @@ const useSettingsStore = create<SettingsState>((set) => ({
     });
   },
   setMockPing: (mockPing) => set({ mockPing }),
+  setHapticsEnabled: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.hapticsEnabled) : val;
+      localStorage.setItem('hapticsEnabled', String(next));
+      return { hapticsEnabled: next };
+    });
+  },
+  setHapticIntensity: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.hapticIntensity) : val;
+      localStorage.setItem('hapticIntensity', next);
+      return { hapticIntensity: next };
+    });
+  },
+  setGameHaptics: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.gameHaptics) : val;
+      localStorage.setItem('gameHaptics', String(next));
+      return { gameHaptics: next };
+    });
+  },
+  setSystemHaptics: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.systemHaptics) : val;
+      localStorage.setItem('systemHaptics', String(next));
+      return { systemHaptics: next };
+    });
+  },
 }));
 
 // Start the simulated ping jitter immediately once
@@ -109,5 +149,13 @@ export function useSettings() {
     currentTheme: store.currentTheme,
     setCurrentTheme: store.setCurrentTheme,
     mockPing: store.mockPing,
+    hapticsEnabled: store.hapticsEnabled,
+    setHapticsEnabled: store.setHapticsEnabled,
+    hapticIntensity: store.hapticIntensity,
+    setHapticIntensity: store.setHapticIntensity,
+    gameHaptics: store.gameHaptics,
+    setGameHaptics: store.setGameHaptics,
+    systemHaptics: store.systemHaptics,
+    setSystemHaptics: store.setSystemHaptics,
   };
 }

@@ -320,8 +320,8 @@ const engine = {
                 console.log("Draw penalty pending, stacking is disabled. Must draw.");
                 return;
             }
-            // Can stack any DrawTwo or WildDrawFour on top of a pending draw penalty
-            const matchesPenalty = card.value === 'DrawTwo' || card.value === 'WildDrawFour';
+            // Can stack ONLY matching penalty cards (+2 on +2, +4 on +4) on top of a pending draw penalty
+            const matchesPenalty = card.value === this.state.currentValue;
             if (!matchesPenalty) {
                 console.log("Cannot stack " + card.value + " on " + this.state.currentValue + ". Must stack penalty or draw.");
                 return;

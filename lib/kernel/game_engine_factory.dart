@@ -73,7 +73,7 @@ class GameEngineFactory {
                 gameId: manifest.id,
                 achievementId: aid,
                 unlockedAt: DateTime.now(),
-              ));
+              ), mode: drift.InsertMode.insertOrIgnore);
           ctx.connectionManager
               .broadcastToRoom(roomId, 'game.achievement_unlocked', {
             'playerId': pid,

@@ -89,13 +89,7 @@ const App: React.FC = () => {
     if (room) {
       attemptFullscreen();
     }
-  }, [room, attemptFullscreen]);
-
-  useEffect(() => {
-    if (room && room.status !== 'waiting') {
-      attemptFullscreen();
-    }
-  }, [room?.status, attemptFullscreen]);
+  }, [room?.id, room?.status, attemptFullscreen]);
 
   useEffect(() => {
     if (room && room.status === 'waiting') {

@@ -59,6 +59,7 @@ class PlayerHandler extends MessageHandler {
           .getSingleOrNull();
       if (dbPlayer != null) {
         if (dbPlayer.sessionToken != null &&
+            sessionToken.isNotEmpty &&
             dbPlayer.sessionToken != sessionToken) {
           connection.send(
               'system.error', 'Invalid session token. Access denied.');
