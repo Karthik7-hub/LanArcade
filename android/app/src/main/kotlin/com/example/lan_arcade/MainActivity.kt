@@ -27,6 +27,15 @@ class MainActivity : FlutterActivity() {
                     stopService(intent)
                     result.success(true)
                 }
+                "getServiceStatus" -> {
+                    val status = mapOf(
+                        "serviceRunning" to ForegroundService.isServiceRunning,
+                        "wakeLock" to ForegroundService.isWakeLockHeld,
+                        "wifiLock" to ForegroundService.isWifiLockHeld,
+                        "multicastLock" to ForegroundService.isMulticastLockHeld
+                    )
+                    result.success(status)
+                }
                 else -> {
                     result.notImplemented()
                 }

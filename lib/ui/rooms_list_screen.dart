@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 import '../kernel/kernel_manager.dart';
 import '../shared/models.dart';
 import '../shared/haptic_manager.dart';
@@ -212,7 +212,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
               children: [
                 Text(
                   'ACTIVE GAMES',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: ArcadeTheme.textPrimary,
@@ -222,7 +222,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'View and manage active game rooms',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     fontSize: 12,
                     color: ArcadeTheme.textSecondary,
                   ),
@@ -248,7 +248,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
             const SizedBox(height: 16),
             Text(
               'No active rooms found',
-              style: GoogleFonts.plusJakartaSans(
+              style: ArcadeFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: ArcadeTheme.textSecondary,
@@ -257,7 +257,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
             const SizedBox(height: 8),
             Text(
               'Rooms will appear here when players start a game.',
-              style: GoogleFonts.plusJakartaSans(
+              style: ArcadeFonts.plusJakartaSans(
                 fontSize: 12,
                 color: Colors.white24,
               ),
@@ -309,7 +309,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                 Expanded(
                                   child: Text(
                                     room.game.name.toUpperCase(),
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: ArcadeFonts.plusJakartaSans(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w900,
                                       color: ArcadeTheme.textPrimary,
@@ -327,7 +327,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                   ),
                                   child: Text(
                                     room.status.name.toUpperCase(),
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: ArcadeFonts.plusJakartaSans(
                                       fontSize: 8,
                                       fontWeight: FontWeight.w900,
                                       color: statusColor,
@@ -342,7 +342,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                               children: [
                                 Text(
                                   'ROOM CODE: ',
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: ArcadeFonts.plusJakartaSans(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: ArcadeTheme.textSecondary,
@@ -350,7 +350,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                 ),
                                 Text(
                                   room.code,
-                                  style: GoogleFonts.firaCode(
+                                  style: ArcadeFonts.firaCode(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w900,
                                     color: ArcadeTheme.primaryColor,
@@ -386,7 +386,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                         const SizedBox(width: 4),
                                         Text(
                                           'COPY LINK',
-                                          style: GoogleFonts.plusJakartaSans(
+                                          style: ArcadeFonts.plusJakartaSans(
                                             fontSize: 9,
                                             fontWeight: FontWeight.bold,
                                             color: ArcadeTheme.textSecondary,
@@ -418,7 +418,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                     children: [
                       Text(
                         'PLAYERS (${room.players.length}/${room.game.maxPlayers})',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: ArcadeFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
                           color: ArcadeTheme.textSecondary,
@@ -429,7 +429,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                       if (room.players.isEmpty)
                         Text(
                           'No players connected.',
-                          style: GoogleFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
+                          style: ArcadeFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
                         )
                       else
                         Wrap(
@@ -461,7 +461,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                     child: Center(
                                       child: Text(
                                         p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
-                                        style: GoogleFonts.plusJakartaSans(
+                                        style: ArcadeFonts.plusJakartaSans(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 9,
@@ -472,7 +472,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                   const SizedBox(width: 6),
                                   Text(
                                     p.name,
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: ArcadeFonts.plusJakartaSans(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       color: ArcadeTheme.textPrimary,

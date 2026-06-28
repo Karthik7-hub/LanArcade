@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.2+3
 
 environment:
   sdk: ^3.11.1
@@ -54,7 +54,6 @@ dependencies:
   nsd: ^5.0.1
   flutter_js: ^0.8.7
   fl_chart: ^1.2.0
-  google_fonts: ^8.1.0
   animations: ^2.2.0
   flutter_animate: ^4.5.2
   permission_handler: ^12.0.3
@@ -90,11 +89,36 @@ flutter:
   assets:
     - assets/shell/
     - assets/shell/assets/
+    - assets/shell/fonts/
+    - assets/fonts/
     - assets/logo.png
     - assets/manifests/
     - assets/engines/
     - assets/clients/
     - assets/clients/sfx/
+
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/plusjakartasans-400.ttf
+        - asset: assets/fonts/plusjakartasans-500.ttf
+          weight: 500
+        - asset: assets/fonts/plusjakartasans-600.ttf
+          weight: 600
+        - asset: assets/fonts/plusjakartasans-700.ttf
+          weight: 700
+        - asset: assets/fonts/plusjakartasans-800.ttf
+          weight: 800
+    - family: FiraCode
+      fonts:
+        - asset: assets/fonts/firacode-400.ttf
+        - asset: assets/fonts/firacode-500.ttf
+          weight: 500
+        - asset: assets/fonts/firacode-700.ttf
+          weight: 700
+    - family: BlackOpsOne
+      fonts:
+        - asset: assets/fonts/blackopsone-400.ttf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

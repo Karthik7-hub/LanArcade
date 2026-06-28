@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../kernel/kernel_manager.dart';
-import '../discovery/discovery_service.dart';
 import '../shared/haptic_manager.dart';
 import 'diagnostics_screen.dart';
 import 'storage_cleanup_screen.dart';
@@ -25,7 +24,6 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final KernelManager _kernel = KernelManager();
-  final DiscoveryService _discovery = DiscoveryService();
   StreamSubscription? _subscription;
   
   bool _isRunning = false;
@@ -42,6 +40,63 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<String> _getIpAddress() async {
     try {
       final interfaces = await NetworkInterface.list();
+      
+      // Heuristic 1: Filter out interfaces that are clearly cellular
+      final localInterfaces = interfaces.where((inter) {
+        final name = inter.name.toLowerCase();
+        return !name.startsWith('rmnet') &&
+               !name.startsWith('ccmni') &&
+               !name.startsWith('pdp') &&
+               !name.startsWith('ppp') &&
+               !name.startsWith('lte') &&
+               !name.startsWith('rmnet_data');
+      }).toList();
+
+      // Heuristic 2: Extract IPv4 addresses
+      final candidates = <Map<String, dynamic>>[];
+      for (var inter in localInterfaces) {
+        for (var addr in inter.addresses) {
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+            candidates.add({
+              'name': inter.name.toLowerCase(),
+              'address': addr.address,
+            });
+          }
+        }
+      }
+
+      if (candidates.isNotEmpty) {
+        // Heuristic 3: Score matching interfaces and private subnets
+        int getScore(String name, String address) {
+          int score = 0;
+          if (name.startsWith('wlan') || name.startsWith('ap') || name.startsWith('softap') || name.startsWith('eth')) {
+            score += 100;
+          }
+          if (address.startsWith('192.168.')) {
+            score += 50;
+          } else if (address.startsWith('172.16.') || address.startsWith('172.17.') || address.startsWith('172.18.') || address.startsWith('172.19.') || address.startsWith('172.20.') || address.startsWith('172.21.') || address.startsWith('172.22.') || address.startsWith('172.23.') || address.startsWith('172.24.') || address.startsWith('172.25.') || address.startsWith('172.26.') || address.startsWith('172.27.') || address.startsWith('172.28.') || address.startsWith('172.29.') || address.startsWith('172.30.') || address.startsWith('172.31.')) {
+            score += 30;
+          } else if (address.startsWith('10.')) {
+            score += 10;
+          }
+          return score;
+        }
+
+        candidates.sort((a, b) {
+          final scoreA = getScore(a['name'] as String, a['address'] as String);
+          final scoreB = getScore(b['name'] as String, b['address'] as String);
+          return scoreB.compareTo(scoreA);
+        });
+
+        return candidates.first['address'] as String;
+      }
+    } catch (e) {
+      debugPrint("Interface scanning failed: $e");
+    }
+
+    // Heuristic 4: Scan all interfaces as fallback
+    try {
+      final interfaces = await NetworkInterface.list();
       for (var interface in interfaces) {
         for (var addr in interface.addresses) {
           if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
@@ -49,9 +104,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           }
         }
       }
-    } catch (e) {
-      debugPrint("Interface scanning failed: $e");
-    }
+    } catch (_) {}
+
     return "127.0.0.1";
   }
 
@@ -81,9 +135,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             if (event.containsKey('activeConnections')) {
               _activePlayersCount = event['activeConnections'];
               _updateChart(_activePlayersCount.toDouble());
-              if (_isRunning) {
-                _discovery.updatePlayersCount(_activePlayersCount);
-              }
             }
             if (event.containsKey('activeRooms')) {
               _activeRoomsCount = event['activeRooms'];
@@ -154,11 +205,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       } catch (e) {
         // Log error
       }
-      try {
-        await _discovery.stop();
-      } catch (e) {
-        // Log error
-      }
       setState(() {
         _isRunning = false;
         _ipAddress = null;
@@ -168,11 +214,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       await _requestPermissions();
       await _kernel.start();
       final ip = await _getIpAddress();
-      try {
-        await _discovery.start("Main Arcade", KernelManager.serverPort);
-      } catch (e) {
-        debugPrint("Discovery failed: $e");
-      }
       setState(() {
         _ipAddress = ip;
         _activeRoomsCount = _kernel.activeRoomsCount;
@@ -213,7 +254,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
           if (confirmExit == true) {
             await _kernel.stop();
-            await _discovery.stop();
             if (context.mounted) {
               SystemNavigator.pop();
             }
@@ -298,7 +338,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const SizedBox(width: 6),
           Text(
             _isRunning ? 'LIVE' : 'OFFLINE',
-            style: GoogleFonts.plusJakartaSans(
+            style: ArcadeFonts.plusJakartaSans(
               color: _isRunning ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -329,7 +369,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             const SizedBox(width: 8),
             Text(
               'LAN ARCADE',
-              style: GoogleFonts.blackOpsOne(
+              style: ArcadeFonts.blackOpsOne(
                 fontSize: 18,
                 letterSpacing: 1.2,
                 color: ArcadeTheme.primaryColor,
@@ -442,7 +482,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             children: [
               Text(
                 label,
-                style: GoogleFonts.plusJakartaSans(
+                style: ArcadeFonts.plusJakartaSans(
                   color: ArcadeTheme.textSecondary,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -455,7 +495,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const SizedBox(height: 12),
           Text(
             value,
-            style: GoogleFonts.plusJakartaSans(
+            style: ArcadeFonts.plusJakartaSans(
               fontSize: 36,
               fontWeight: FontWeight.w800,
               letterSpacing: -1,
@@ -493,7 +533,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Text(
             'SCAN QR OR COPY LINK',
-            style: GoogleFonts.plusJakartaSans(
+            style: ArcadeFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color: ArcadeTheme.textSecondary,
@@ -543,7 +583,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   const SizedBox(width: 8),
                   Text(
                     serverUrl,
-                    style: GoogleFonts.firaCode(
+                    style: ArcadeFonts.firaCode(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                       color: ArcadeTheme.textPrimary,
@@ -571,7 +611,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             children: [
               Text(
                 'SERVER ACTIVITY',
-                style: GoogleFonts.plusJakartaSans(
+                style: ArcadeFonts.plusJakartaSans(
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
                   color: ArcadeTheme.textSecondary,
@@ -662,7 +702,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 const SizedBox(width: 12),
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     color: fg,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -686,7 +726,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Text(
             'GAMES',
-            style: GoogleFonts.plusJakartaSans(
+            style: ArcadeFonts.plusJakartaSans(
               fontWeight: FontWeight.bold,
               fontSize: 11,
               color: ArcadeTheme.textSecondary,
@@ -699,7 +739,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'No games installed.',
-                style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 13),
+                style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 13),
               ),
             )
           else
@@ -728,7 +768,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           children: [
                             Text(
                               games[i].name,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: ArcadeFonts.plusJakartaSans(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
                                 color: ArcadeTheme.textPrimary,
@@ -737,7 +777,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             const SizedBox(height: 2),
                             Text(
                               'Version ${games[i].version} • by ${games[i].author}',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: ArcadeFonts.plusJakartaSans(
                                 fontSize: 11,
                                 color: ArcadeTheme.textSecondary,
                               ),
@@ -753,7 +793,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ),
                         child: Text(
                           '${games[i].minPlayers}-${games[i].maxPlayers}P',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: ArcadeFonts.plusJakartaSans(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: ArcadeTheme.textPrimary,

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -13,6 +15,7 @@ import '../database/database.dart';
 import '../rooms/room_service.dart';
 import '../plugins/plugin_manager.dart';
 import '../shared/models.dart';
+import '../discovery/discovery_service.dart';
 
 class KernelManager {
   static const int serverPort = 8080;
@@ -31,12 +34,37 @@ class KernelManager {
   final List<String> _logHistory = [];
   List<String> get logHistory => List.unmodifiable(_logHistory);
 
-  String _status = 'OFFLINE';
-  String get status => _status;
+  ServerState _state = ServerState.offline;
+  ServerState get state => _state;
+
+  String get status => _state.name.toUpperCase();
+
+  // Resource Ownership flags
+  bool _dbOpen = false;
+  bool _runtimeStarted = false;
+  bool _discoveryStarted = false;
+  bool _foregroundServiceStarted = false;
+  bool _cleanupTimerStarted = false;
+
+  DateTime? _startupTime;
+  DateTime? get startupTime => _startupTime;
+
+  Duration pingInterval = const Duration(seconds: 30);
 
   void _addStats(Map<String, dynamic> event) {
     if (event.containsKey('status')) {
-      _status = event['status'].toString().toUpperCase();
+      final s = event['status'].toString().toLowerCase();
+      if (s == 'running') {
+        _state = ServerState.running;
+      } else if (s == 'stopping') {
+        _state = ServerState.stopping;
+      } else if (s == 'error') {
+        _state = ServerState.error;
+      } else if (s == 'stopped') {
+        _state = ServerState.offline;
+      } else if (s == 'starting') {
+        _state = ServerState.starting;
+      }
     }
     if (event.containsKey('log')) {
       final logText = event['log'].toString();
@@ -60,13 +88,14 @@ class KernelManager {
   Map<String, Room> get activeRooms => _runtime?.roomData ?? {};
 
   Future<void> start() async {
-    if (_runtime?.isRunning == true) return;
+    if (_state != ServerState.offline && _state != ServerState.error) return;
 
+    _state = ServerState.starting;
     _addStats({'log': 'SERVER_START_REQUESTED', 'status': 'starting'});
 
     try {
       _addStats({'log': 'EXTRACTING_ASSETS...'});
-      final webPath = await AssetExtractor.extractShellAssets();
+      final webPath = await AssetExtractor.extractShellAssets().timeout(const Duration(seconds: 5));
       _addStats({'log': 'ASSETS_READY: $webPath'});
 
       final roomService = RoomService(db);
@@ -78,45 +107,156 @@ class KernelManager {
         roomService: roomService,
       );
 
-      // Forward stats from the runtime
       _runtime!.statsStream.listen((event) {
         _addStats(event);
       });
 
-      await _runtime!.start(webPath);
-      await ForegroundServiceManager.start();
+      // 1. Touch Database to verify connection
+      await db.customSelect('SELECT 1').getSingle().timeout(const Duration(seconds: 5));
+      _dbOpen = true;
+
+      // 2. Start HTTP and WebSocket server
+      await _runtime!.start(webPath, pingInterval: pingInterval).timeout(const Duration(seconds: 5));
+      _runtimeStarted = true;
+
+      // 3. Start Discovery Service (mDNS)
+      final discovery = DiscoveryService();
+      await discovery.start("Main Arcade", serverPort).timeout(const Duration(seconds: 5));
+      _discoveryStarted = true;
+
+      // 4. Start Foreground Service (acquires native locks)
+      await ForegroundServiceManager.start().timeout(const Duration(seconds: 5));
+      _foregroundServiceStarted = true;
       
-      // Start background auto cleanup timer
+      // 5. Start background auto cleanup timer
       _startAutoCleanupTimer();
+      _cleanupTimerStarted = true;
+
+      _startupTime = DateTime.now();
+      _state = ServerState.running;
+      _addStats({'status': 'running', 'log': 'SERVER_ONLINE'});
     } catch (e) {
       _addStats({
         'log': 'SERVER_FAILED: $e',
         'status': 'error',
         'error': e.toString(),
       });
+      await stop();
+      _state = ServerState.error;
     }
   }
 
   Future<void> stop() async {
-    _autoCleanupTimer?.cancel();
-    _autoCleanupTimer = null;
-    
-    if (_runtime != null) {
-      await _runtime!.stop();
-      _runtime!.dispose();
-      _runtime = null;
-      await ForegroundServiceManager.stop();
+    final oldState = _state;
+    _state = ServerState.stopping;
+    _addStats({'status': 'stopping', 'log': 'SERVER_SHUTTING_DOWN'});
+
+    // Graceful Shutdown Sequence: broadcast alert, wait, then clean up.
+    if (oldState == ServerState.running && _runtimeStarted && _runtime != null) {
+      try {
+        _runtime!.logSystemEvent('GRACEFUL_SHUTDOWN_INITIATED: Notifying clients...');
+        _runtime!.connectionManager.broadcastAll('system.shutdown', 'Host server is shutting down');
+        await Future.delayed(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint("Graceful shutdown error: $e");
+      }
     }
-    await _db?.close();
-    _db = null;
+
+    if (_cleanupTimerStarted) {
+      _autoCleanupTimer?.cancel();
+      _autoCleanupTimer = null;
+      _cleanupTimerStarted = false;
+    }
+
+    if (_discoveryStarted) {
+      try {
+        await DiscoveryService().stop().timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint("Discovery stop timed out: $e");
+      }
+      _discoveryStarted = false;
+    }
+    
+    if (_runtimeStarted && _runtime != null) {
+      try {
+        await _runtime!.stop().timeout(const Duration(seconds: 2));
+        _runtime!.dispose();
+      } catch (e) {
+        debugPrint("Runtime stop timed out: $e");
+      }
+      _runtime = null;
+      _runtimeStarted = false;
+    }
+
+    if (_foregroundServiceStarted) {
+      try {
+        await ForegroundServiceManager.stop().timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint("Foreground service stop timed out: $e");
+      }
+      _foregroundServiceStarted = false;
+    }
+
+    if (_dbOpen && _db != null) {
+      try {
+        await _db!.close().timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint("Database close timed out: $e");
+      }
+      _db = null;
+      _dbOpen = false;
+    }
+
+    _startupTime = null;
+    _state = ServerState.offline;
     _addStats({'status': 'stopped', 'log': 'SERVER_STOPPED'});
   }
 
   Future<void> dispose() async {
     await stop();
     _statsController.close();
-    await _db?.close();
-    _db = null;
+  }
+
+  // Native Diagnostics Helper Method
+  Future<Map<String, dynamic>> getNativeServiceStatus() async {
+    if (!_foregroundServiceStarted) {
+      return {
+        'serviceRunning': false,
+        'wakeLock': false,
+        'wifiLock': false,
+        'multicastLock': false,
+      };
+    }
+    try {
+      const channel = MethodChannel('com.lanarcade.lan_arcade/foreground_service');
+      final result = await channel.invokeMethod('getServiceStatus');
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+    } catch (e) {
+      debugPrint("Failed to get native service status: $e");
+    }
+    return {
+      'serviceRunning': false,
+      'wakeLock': false,
+      'wifiLock': false,
+      'multicastLock': false,
+    };
+  }
+
+  // Dart Server Diagnostics Helper Method
+  Map<String, dynamic> getDiagnosticsInfo() {
+    final uptime = _startupTime != null ? DateTime.now().difference(_startupTime!) : Duration.zero;
+    final wsCount = _runtime?.connectionManager.activeCount ?? 0;
+    final identifiedCount = _runtime?.connectionManager.identifiedCount ?? 0;
+    
+    return {
+      'uptime': uptime,
+      'openSockets': wsCount,
+      'identifiedPlayers': identifiedCount,
+      'activeRooms': activeRoomsCount,
+      'mDNSState': _discoveryStarted ? 'Registered' : 'Inactive',
+    };
   }
 
   // --- Storage & Cleanup Center Service Methods ---

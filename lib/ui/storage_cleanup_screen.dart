@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 import '../kernel/kernel_manager.dart';
 import '../kernel/cleanup_settings.dart';
 import '../shared/models.dart';
@@ -14,8 +14,8 @@ class StorageCleanupScreen extends StatefulWidget {
 }
 
 class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
-  static final TextStyle _firaCodeStyle = GoogleFonts.firaCode();
-  static final TextStyle _plusJakartaSansStyle = GoogleFonts.plusJakartaSans();
+  static final TextStyle _firaCodeStyle = ArcadeFonts.firaCode();
+  static final TextStyle _plusJakartaSansStyle = ArcadeFonts.plusJakartaSans();
 
   bool _isLoading = true;
   Map<String, dynamic> _stats = {};
@@ -146,7 +146,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                 TextField(
                   controller: textController,
                   autofocus: true,
-                  style: GoogleFonts.firaCode(color: ArcadeTheme.textPrimary),
+                  style: ArcadeFonts.firaCode(color: ArcadeTheme.textPrimary),
                   decoration: const InputDecoration(
                     hintText: 'DELETE',
                   ),
@@ -201,7 +201,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       appBar: AppBar(
         title: Text(
           'STORAGE SETTINGS',
-          style: GoogleFonts.blackOpsOne(
+          style: ArcadeFonts.blackOpsOne(
             fontSize: 20,
             letterSpacing: 1.5,
             color: ArcadeTheme.primaryColor,
@@ -253,7 +253,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               Expanded(
                 child: Text(
                   'SAVED ROOMS',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.0,
@@ -478,11 +478,11 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
             children: [
               Text(
                 'STORAGE USED',
-                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: ArcadeTheme.textPrimary, fontSize: 13),
+                style: ArcadeFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: ArcadeTheme.textPrimary, fontSize: 13),
               ),
               Text(
                 '${_stats['storageUsedMb']} MB',
-                style: GoogleFonts.firaCode(
+                style: ArcadeFonts.firaCode(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: ArcadeTheme.primaryColor,
@@ -506,10 +506,10 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 14)),
+          Text(label, style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 14)),
           Text(
             value.toString(),
-            style: GoogleFonts.firaCode(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
+            style: ArcadeFonts.firaCode(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
           ),
         ],
       ),
@@ -533,7 +533,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                     Expanded(
                       child: Text(
                         'AUTO CLEANUP',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: ArcadeFonts.plusJakartaSans(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
@@ -629,11 +629,11 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
         children: [
           Text(
             title,
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
+            style: ArcadeFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
           ),
           Text(
             subtitle,
-            style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
+            style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
           ),
           const SizedBox(height: 8),
           Container(
@@ -649,7 +649,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
                 isExpanded: true,
                 dropdownColor: ArcadeTheme.surfaceColor,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
-                style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textPrimary, fontSize: 14),
+                style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textPrimary, fontSize: 14),
                 onChanged: onChanged,
                 items: options.entries
                     .map((e) => DropdownMenuItem<int>(
@@ -678,7 +678,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               Expanded(
                 child: Text(
                   'DELETE DATA MANUALLY',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.0,
@@ -725,12 +725,12 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
+                  style: ArcadeFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: ArcadeTheme.textPrimary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
+                  style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 11),
                 ),
               ],
             ),
@@ -758,7 +758,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
               const SizedBox(width: 12),
               Text(
                 'DELETE EVERYTHING',
-                style: GoogleFonts.plusJakartaSans(
+                style: ArcadeFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.0,
@@ -771,7 +771,7 @@ class _StorageCleanupScreenState extends State<StorageCleanupScreen> {
           Text(
             'Full cleanup will permanently delete all room data, reconnect states, and gameplay log tables.\n'
             'Statistics, achievements, and player profiles are fully preserved.',
-            style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 12),
+            style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 16),
           ArcadeButton.danger(

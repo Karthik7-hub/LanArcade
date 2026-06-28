@@ -1,0 +1,83 @@
+{
+  "id": "ludo",
+  "name": "Ludo Classic",
+  "version": "1.0.0",
+  "sdkVersion": "1.0.0",
+  "author": "LAN Arcade",
+  "description": "The classic board game of strategy and luck for 2 to 4 players.",
+  "minPlayers": 2,
+  "maxPlayers": 4,
+  "permissions": ["private-state", "timers", "persistent-storage"],
+  "supportsHaptics": true,
+  "hapticProfile": "board-game",
+  "entry": "index.html",
+  "preferredOrientation": "portrait",
+  "supportedOrientations": ["portrait"],
+  "displayOrder": 3,
+  "featured": true,
+  "hidden": false,
+  "comingSoon": false,
+  "accentColor": "#22c55e",
+  "accentDark": "#15803d",
+  "badgeLabel": "BOARD GAME",
+  "estimatedMatchLength": "15-20 mins",
+  "difficulty": "easy",
+  "supportsReconnect": true,
+  "supportsSpectators": true,
+  "supportsAudio": true,
+  "supportsPause": true,
+  "supportsResume": true,
+  "thumbnail": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231e1b4b'/%3E%3Cstop offset='100%25' stop-color='%23311042'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='320' height='180' fill='url(%23bg)'/%3E%3Cg transform='translate(100, 30)'%3E%3Crect x='0' y='0' width='120' height='120' rx='10' fill='%23ffffff' stroke='%23475569' stroke-width='4'/%3E%3Crect x='0' y='0' width='50' height='50' fill='%23ef4444' rx='6'/%3E%3Crect x='70' y='0' width='50' height='50' fill='%2322c55e' rx='6'/%3E%3Crect x='0' y='70' width='50' height='50' fill='%233b82f6' rx='6'/%3E%3Crect x='70' y='70' width='50' height='50' fill='%23eab308' rx='6'/%3E%3Ccircle cx='25' cy='25' r='12' fill='white'/%3E%3Ccircle cx='25' cy='25' r='8' fill='%23ef4444'/%3E%3Ccircle cx='95' cy='25' r='12' fill='white'/%3E%3Ccircle cx='95' cy='25' r='8' fill='%2322c55e'/%3E%3Ccircle cx='25' cy='95' r='12' fill='white'/%3E%3Ccircle cx='25' cy='95' r='8' fill='%233b82f6'/%3E%3Ccircle cx='95' cy='95' r='12' fill='white'/%3E%3Ccircle cx='95' cy='95' r='8' fill='%23eab308'/%3E%3C/g%3E%3C/svg%3E",
+  "settingsSchema": {
+    "preset": {
+      "type": "select",
+      "label": "Rules Preset",
+      "description": "Configure rules archetype",
+      "default": "classic",
+      "options": [
+        {"value": "classic", "label": "Classic Ludo (4 Tokens)"},
+        {"value": "quick", "label": "Quick Ludo (2 Tokens)"}
+      ],
+      "values": {
+        "classic": {
+          "tokensPerPlayer": 4,
+          "sixRollsAgain": true,
+          "threeSixesSkip": true,
+          "safeZonesProtected": true
+        },
+        "quick": {
+          "tokensPerPlayer": 2,
+          "sixRollsAgain": true,
+          "threeSixesSkip": true,
+          "safeZonesProtected": true
+        }
+      }
+    },
+    "tokensPerPlayer": {
+      "type": "number",
+      "label": "Tokens per Player",
+      "description": "Number of tokens each player must race (1-4)",
+      "default": 4,
+      "min": 1,
+      "max": 4
+    },
+    "sixRollsAgain": {
+      "type": "boolean",
+      "label": "Rolling 6 Rolls Again",
+      "description": "Rolling a six awards another turn",
+      "default": true
+    },
+    "threeSixesSkip": {
+      "type": "boolean",
+      "label": "Three Sixes Skip Turn",
+      "description": "Rolling three consecutive sixes skips your turn",
+      "default": true
+    },
+    "safeZonesProtected": {
+      "type": "boolean",
+      "label": "Safe Zones Protected",
+      "description": "Tokens cannot be captured when resting on safe star cells",
+      "default": true
+    }
+  }
+}

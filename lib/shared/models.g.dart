@@ -32,11 +32,22 @@ GameManifest _$GameManifestFromJson(Map<String, dynamic> json) => GameManifest(
   entry: json['entry'] as String,
   minPlayers: (json['minPlayers'] as num).toInt(),
   maxPlayers: (json['maxPlayers'] as num).toInt(),
+  preferredOrientation: json['preferredOrientation'] as String?,
+  supportedOrientations: (json['supportedOrientations'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
+  displayOrder: (json['displayOrder'] as num?)?.toInt(),
+  featured: json['featured'] as bool?,
+  hidden: json['hidden'] as bool?,
+  comingSoon: json['comingSoon'] as bool?,
   thumbnail: json['thumbnail'] as String?,
   settingsSchema: json['settingsSchema'] as Map<String, dynamic>?,
   description: json['description'] as String?,
   supportsHaptics: json['supportsHaptics'] as bool?,
   hapticProfile: json['hapticProfile'] as String?,
+  accentColor: json['accentColor'] as String?,
+  accentDark: json['accentDark'] as String?,
+  badgeLabel: json['badgeLabel'] as String?,
 );
 
 Map<String, dynamic> _$GameManifestToJson(GameManifest instance) =>
@@ -50,11 +61,20 @@ Map<String, dynamic> _$GameManifestToJson(GameManifest instance) =>
       'entry': instance.entry,
       'minPlayers': instance.minPlayers,
       'maxPlayers': instance.maxPlayers,
+      'preferredOrientation': instance.preferredOrientation,
+      'supportedOrientations': instance.supportedOrientations,
+      'displayOrder': instance.displayOrder,
+      'featured': instance.featured,
+      'hidden': instance.hidden,
+      'comingSoon': instance.comingSoon,
       'thumbnail': instance.thumbnail,
       'settingsSchema': instance.settingsSchema,
       'description': instance.description,
       'supportsHaptics': instance.supportsHaptics,
       'hapticProfile': instance.hapticProfile,
+      'accentColor': instance.accentColor,
+      'accentDark': instance.accentDark,
+      'badgeLabel': instance.badgeLabel,
     };
 
 Room _$RoomFromJson(Map<String, dynamic> json) => Room(

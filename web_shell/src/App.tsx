@@ -35,6 +35,20 @@ const App: React.FC = () => {
     return localStorage.getItem('isViewingLobby') === 'true';
   });
 
+  // Track screen orientation reactively
+  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
   const {
     isFullscreen,
     showFsBanner,
@@ -136,6 +150,7 @@ const App: React.FC = () => {
         <HomeScreen
           availableGames={availableGames}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          isPortrait={isPortrait}
         />
       );
     }
@@ -150,13 +165,41 @@ const App: React.FC = () => {
         isViewingLobby={isViewingLobby}
         setIsViewingLobby={setIsViewingLobby}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        isPortrait={isPortrait}
       />
     );
   };
 
+  // Determine orientation capability requirements (gameplay only)
+  // Desktop devices (mouse pointer, no touch) should NEVER see orientation overlays
+  const isMobileDevice = (
+    window.matchMedia('(pointer: coarse)').matches ||
+    navigator.maxTouchPoints > 0
+  ) && !window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+
+  const isInGameplay = room && room.status !== 'waiting' && !isViewingLobby;
+  let showOrientationOverlay = false;
+  let requiredOrientation: 'landscape' | 'portrait' = 'landscape';
+
+  if (isInGameplay && isMobileDevice) {
+    const game = room.game;
+    const supported = game.supportedOrientations || ['landscape'];
+    if (supported.includes('landscape') && supported.includes('portrait')) {
+      showOrientationOverlay = false;
+    } else {
+      const preferred = game.preferredOrientation || 'landscape';
+      requiredOrientation = preferred;
+      if (preferred === 'landscape' && isPortrait) {
+        showOrientationOverlay = true;
+      } else if (preferred === 'portrait' && !isPortrait) {
+        showOrientationOverlay = true;
+      }
+    }
+  }
+
   return (
     <>
-      <PortraitOverlay />
+      {showOrientationOverlay && <PortraitOverlay mode={requiredOrientation} />}
       <ErrorAlert message={errorAlert} onDismiss={() => setErrorAlert(null)} />
       {renderView()}
       <SettingsModal
@@ -164,6 +207,7 @@ const App: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)}
         isViewingLobby={isViewingLobby}
         setIsViewingLobby={setIsViewingLobby}
+        isPortrait={isPortrait}
       />
       <ProfileModal
         isOpen={isProfileModalOpen}

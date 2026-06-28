@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../database/database.dart';
 import '../kernel/kernel_manager.dart';
@@ -101,11 +101,11 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
       builder: (context) => AlertDialog(
         title: Text(
           'DELETE PLAYER?',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+          style: ArcadeFonts.plusJakartaSans(fontWeight: FontWeight.bold),
         ),
         content: Text(
           'Are you sure you want to delete ${player.name}? All stats, wins, and achievements will be permanently deleted.',
-          style: GoogleFonts.plusJakartaSans(),
+          style: ArcadeFonts.plusJakartaSans(),
         ),
         actions: [
           TextButton(
@@ -239,7 +239,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
               children: [
                 Text(
                   'PLAYERS',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: ArcadeTheme.textPrimary,
@@ -249,7 +249,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Scan QR code to log in on your phone',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: ArcadeFonts.plusJakartaSans(
                     fontSize: 12,
                     color: ArcadeTheme.textSecondary,
                   ),
@@ -272,7 +272,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
           const SizedBox(height: 16),
           Text(
             'No players registered',
-            style: GoogleFonts.plusJakartaSans(
+            style: ArcadeFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: ArcadeTheme.textSecondary,
@@ -281,7 +281,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
           const SizedBox(height: 8),
           Text(
             'Players will appear here after they join.',
-            style: GoogleFonts.plusJakartaSans(
+            style: ArcadeFonts.plusJakartaSans(
               fontSize: 12,
               color: Colors.white24,
             ),
@@ -339,7 +339,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                         child: Center(
                           child: Text(
                             player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: ArcadeFonts.plusJakartaSans(
                               color: avatarColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
@@ -354,7 +354,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                           children: [
                             Text(
                               player.name,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: ArcadeFonts.plusJakartaSans(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                                 color: ArcadeTheme.textPrimary,
@@ -363,7 +363,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                             const SizedBox(height: 2),
                             Text(
                               'ID: ${player.id.substring(0, 8)}...',
-                              style: GoogleFonts.firaCode(
+                              style: ArcadeFonts.firaCode(
                                 fontSize: 11,
                                 color: ArcadeTheme.textSecondary,
                               ),
@@ -385,7 +385,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                             const SizedBox(width: 4),
                             Text(
                               '$totalWins Wins',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: ArcadeFonts.plusJakartaSans(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: ArcadeTheme.primaryColor,
@@ -472,7 +472,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 'SCAN TO LOGIN',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: ArcadeFonts.plusJakartaSans(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
                                   color: ArcadeTheme.textSecondary,
@@ -489,7 +489,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                         children: [
                           Text(
                             'WINS BY GAME',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: ArcadeFonts.plusJakartaSans(
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               color: ArcadeTheme.textSecondary,
@@ -501,7 +501,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
                             icon: const Icon(Icons.delete_outline_rounded, color: ArcadeTheme.errorColor, size: 16),
                             label: Text(
                               'DELETE PLAYER',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: ArcadeFonts.plusJakartaSans(
                                 color: ArcadeTheme.errorColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -539,7 +539,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.plusJakartaSans(
+          style: ArcadeFonts.plusJakartaSans(
             fontSize: 10,
             fontWeight: FontWeight.w900,
             color: ArcadeTheme.textSecondary,
@@ -559,7 +559,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
               Expanded(
                 child: Text(
                   value,
-                  style: GoogleFonts.firaCode(
+                  style: ArcadeFonts.firaCode(
                     fontSize: 12,
                     color: ArcadeTheme.textPrimary,
                   ),
@@ -589,7 +589,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Text(
           'No game wins recorded yet.',
-          style: GoogleFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
+          style: ArcadeFonts.plusJakartaSans(color: Colors.white24, fontSize: 12),
         ),
       );
     }
@@ -614,7 +614,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
             children: [
               Text(
                 gameId.toUpperCase(),
-                style: GoogleFonts.plusJakartaSans(
+                style: ArcadeFonts.plusJakartaSans(
                   fontSize: 9,
                   fontWeight: FontWeight.w900,
                   color: ArcadeTheme.textSecondary,
@@ -624,7 +624,7 @@ class _PlayersListScreenState extends State<PlayersListScreen> {
               const SizedBox(height: 2),
               Text(
                 '$wins Wins',
-                style: GoogleFonts.plusJakartaSans(
+                style: ArcadeFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: ArcadeTheme.textPrimary,

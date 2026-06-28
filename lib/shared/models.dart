@@ -45,11 +45,20 @@ class GameManifest {
   final String entry;
   final int minPlayers;
   final int maxPlayers;
+  final String? preferredOrientation;
+  final List<String>? supportedOrientations;
+  final int? displayOrder;
+  final bool? featured;
+  final bool? hidden;
+  final bool? comingSoon;
   final String? thumbnail;
   final Map<String, dynamic>? settingsSchema;
   final String? description;
   final bool? supportsHaptics;
   final String? hapticProfile;
+  final String? accentColor;
+  final String? accentDark;
+  final String? badgeLabel;
 
   GameManifest({
     required this.id,
@@ -61,11 +70,20 @@ class GameManifest {
     required this.entry,
     required this.minPlayers,
     required this.maxPlayers,
+    this.preferredOrientation,
+    this.supportedOrientations,
+    this.displayOrder,
+    this.featured,
+    this.hidden,
+    this.comingSoon,
     this.thumbnail,
     this.settingsSchema,
     this.description,
     this.supportsHaptics,
     this.hapticProfile,
+    this.accentColor,
+    this.accentDark,
+    this.badgeLabel,
   });
 
   factory GameManifest.fromJson(Map<String, dynamic> json) => _$GameManifestFromJson(json);
@@ -129,3 +147,6 @@ class Room {
   factory Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);
   Map<String, dynamic> toJson() => _$RoomToJson(this);
 }
+
+enum ServerState { offline, starting, running, stopping, error }
+

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 
 class ArcadeTheme {
   // Brand color scheme definitions (Dark Graphite + Premium Blue + White)
@@ -38,12 +38,12 @@ class ArcadeTheme {
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: Colors.white10, width: 1),
         ),
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: ArcadeFonts.plusJakartaSans(
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: textPrimary,
         ),
-        contentTextStyle: GoogleFonts.plusJakartaSans(
+        contentTextStyle: ArcadeFonts.plusJakartaSans(
           fontSize: 14,
           color: textSecondary,
         ),
@@ -64,8 +64,8 @@ class ArcadeTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: primaryColor, width: 1.5),
         ),
-        labelStyle: GoogleFonts.plusJakartaSans(color: textSecondary),
-        hintStyle: GoogleFonts.plusJakartaSans(color: Colors.white24),
+        labelStyle: ArcadeFonts.plusJakartaSans(color: textSecondary),
+        hintStyle: ArcadeFonts.plusJakartaSans(color: Colors.white24),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -76,7 +76,7 @@ class ArcadeTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: ArcadeFonts.plusJakartaSans(
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -89,7 +89,7 @@ class ArcadeTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(
+          textStyle: ArcadeFonts.plusJakartaSans(
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -100,7 +100,7 @@ class ArcadeTheme {
         thickness: 1,
         space: 24,
       ),
-      textTheme: GoogleFonts.plusJakartaSansTextTheme(
+      textTheme: ArcadeFonts.plusJakartaSansTextTheme(
         ThemeData.dark().textTheme.apply(bodyColor: textPrimary, displayColor: textPrimary),
       ),
       colorScheme: const ColorScheme.dark(
@@ -243,7 +243,7 @@ class ArcadeButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: borderSide,
       ),
-      textStyle: GoogleFonts.plusJakartaSans(
+      textStyle: ArcadeFonts.plusJakartaSans(
         fontWeight: FontWeight.bold,
         fontSize: 14,
       ),

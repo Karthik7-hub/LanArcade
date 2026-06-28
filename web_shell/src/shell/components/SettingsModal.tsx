@@ -10,16 +10,18 @@ import { useConfirm } from './ConfirmDialog';
 import { wsClient, clearRoomFromUrl } from '../WebSocketClient';
 import { IdentityManager } from '../IdentityManager';
 import { resolveAvatarColor } from '../constants';
+import { audioManager } from '../../plugin_runtime/AudioManager';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   isViewingLobby: boolean;
   setIsViewingLobby: (v: boolean) => void;
+  isPortrait?: boolean;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen, onClose, isViewingLobby, setIsViewingLobby,
+  isOpen, onClose, isViewingLobby, setIsViewingLobby, isPortrait,
 }) => {
   const room = useStore((s) => s.room);
   const player = useStore((s) => s.player);
@@ -28,8 +30,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const confirm = useConfirm();
 
   const {
-    soundEffects, setSoundEffects,
-    soundVolume, setSoundVolume,
+    mute, setMute,
+    masterVolume, setMasterVolume,
+    sfxVolume, setSfxVolume,
+    musicVolume, setMusicVolume,
     highContrast, setHighContrast,
     textScaling, setTextScaling,
     currentTheme, setCurrentTheme,
@@ -90,7 +94,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (ok) {
       wsClient.send('room.leave', {});
       clearRoomFromUrl();
-      window.location.reload();
+      const store = useStore.getState();
+      store.setRoom(null);
+      store.setPublicGameState(null);
+      store.setPrivateGameState(null);
+      onClose();
     }
   };
 
@@ -117,25 +125,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="settings-modal-overlay">
-      <div className="console-settings-card">
+      <div className={`console-settings-card ${isPortrait ? 'portrait-modal' : ''}`}>
         {/* Header */}
         <div className="console-settings-header">
           <span className="console-settings-title-wrap">
             <Settings size={20} className="tab-header-icon" />
             <h3>SYSTEM SETTINGS</h3>
           </span>
-          <button onClick={onClose} className="console-settings-close-btn">
+          <button onClick={() => { onClose(); audioManager.playUI('click'); }} className="console-settings-close-btn">
             <X size={20} />
           </button>
         </div>
 
-        <div className="console-settings-layout">
+        <div className={`console-settings-layout ${isPortrait ? 'portrait-console' : ''}`}>
           {/* Sidebar */}
           <div className="console-settings-sidebar">
             {categoriesList.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setActiveTab(cat.id as any)}
+                onClick={() => {
+                  setActiveTab(cat.id as any);
+                  audioManager.playUI('nav');
+                }}
                 className={`console-settings-sidebar-btn ${activeTab === cat.id ? 'active' : ''}`}
               >
                 {cat.icon}
@@ -205,29 +216,84 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h4 className="pane-title">AUDIO & HAPTICS SETTINGS</h4>
                 <div className="pane-control-card">
                   <div className="pane-control-label">
-                    <strong>Sound Effects</strong>
-                    <p>Enable game and UI micro-interaction audio</p>
+                    <strong>Mute All Audio</strong>
+                    <p>Silence all game and UI sound effects</p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={soundEffects}
-                    onChange={() => setSoundEffects((prev) => !prev)}
-                    className="pane-checkbox"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button
+                      onClick={() => {
+                        const nextMute = !mute;
+                        setMute(nextMute);
+                        audioManager.playUI('click');
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: mute ? 'var(--danger)' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px'
+                      }}
+                    >
+                      {mute ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    </button>
+                    <input
+                      type="checkbox"
+                      checked={mute}
+                      onChange={(e) => {
+                        setMute(e.target.checked);
+                        audioManager.playUI('click');
+                      }}
+                      className="pane-checkbox"
+                    />
+                  </div>
                 </div>
                 <div className="pane-control-card slider-card">
                   <div className="pane-control-label">
-                    <strong>Volume</strong>
-                    <p>Master audio level ({soundVolume}%)</p>
+                    <strong>Master Volume</strong>
+                    <p>Overall system volume level ({masterVolume}%)</p>
                   </div>
                   <div className="pane-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'flex-end' }}>
-                    {soundVolume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
                     <input
                       type="range"
                       min="0"
                       max="100"
-                      value={soundVolume}
-                      onChange={(e) => setSoundVolume(Number(e.target.value))}
+                      value={masterVolume}
+                      onChange={(e) => setMasterVolume(Number(e.target.value))}
+                      className="pane-slider"
+                    />
+                  </div>
+                </div>
+                <div className="pane-control-card slider-card">
+                  <div className="pane-control-label">
+                    <strong>Sound Effects Volume</strong>
+                    <p>Game and UI interaction sound level ({sfxVolume}%)</p>
+                  </div>
+                  <div className="pane-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'flex-end' }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={sfxVolume}
+                      onChange={(e) => setSfxVolume(Number(e.target.value))}
+                      className="pane-slider"
+                    />
+                  </div>
+                </div>
+                <div className="pane-control-card slider-card">
+                  <div className="pane-control-label">
+                    <strong>Music Volume</strong>
+                    <p>Background music volume level ({musicVolume}%)</p>
+                  </div>
+                  <div className="pane-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'flex-end' }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={musicVolume}
+                      onChange={(e) => setMusicVolume(Number(e.target.value))}
                       className="pane-slider"
                     />
                   </div>

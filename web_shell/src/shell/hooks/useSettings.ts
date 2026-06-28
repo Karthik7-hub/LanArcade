@@ -4,6 +4,10 @@ import { useEffect } from 'react';
 interface SettingsState {
   soundEffects: boolean;
   soundVolume: number;
+  mute: boolean;
+  masterVolume: number;
+  sfxVolume: number;
+  musicVolume: number;
   highContrast: boolean;
   textScaling: 'normal' | 'large';
   currentTheme: string;
@@ -15,6 +19,10 @@ interface SettingsState {
 
   setSoundEffects: (val: boolean | ((prev: boolean) => boolean)) => void;
   setSoundVolume: (val: number | ((prev: number) => number)) => void;
+  setMute: (val: boolean | ((prev: boolean) => boolean)) => void;
+  setMasterVolume: (val: number | ((prev: number) => number)) => void;
+  setSfxVolume: (val: number | ((prev: number) => number)) => void;
+  setMusicVolume: (val: number | ((prev: number) => number)) => void;
   setHighContrast: (val: boolean | ((prev: boolean) => boolean)) => void;
   setTextScaling: (val: ('normal' | 'large') | ((prev: 'normal' | 'large') => 'normal' | 'large')) => void;
   setCurrentTheme: (val: string | ((prev: string) => string)) => void;
@@ -25,9 +33,13 @@ interface SettingsState {
   setSystemHaptics: (val: boolean | ((prev: boolean) => boolean)) => void;
 }
 
-const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set) => ({
   soundEffects: localStorage.getItem('soundEffects') !== 'false',
   soundVolume: Number(localStorage.getItem('soundVolume') ?? '80'),
+  mute: localStorage.getItem('soundMute') === 'true',
+  masterVolume: Number(localStorage.getItem('masterVolume') ?? '80'),
+  sfxVolume: Number(localStorage.getItem('sfxVolume') ?? '80'),
+  musicVolume: Number(localStorage.getItem('musicVolume') ?? '80'),
   highContrast: localStorage.getItem('highContrast') === 'true',
   textScaling: (localStorage.getItem('textScaling') as 'normal' | 'large') ?? 'normal',
   currentTheme: localStorage.getItem('uiTheme') ?? 'slate',
@@ -41,14 +53,46 @@ const useSettingsStore = create<SettingsState>((set) => ({
     set((state) => {
       const next = typeof val === 'function' ? val(state.soundEffects) : val;
       localStorage.setItem('soundEffects', String(next));
-      return { soundEffects: next };
+      localStorage.setItem('soundMute', String(!next));
+      return { soundEffects: next, mute: !next };
     });
   },
   setSoundVolume: (val) => {
     set((state) => {
       const next = typeof val === 'function' ? val(state.soundVolume) : val;
       localStorage.setItem('soundVolume', String(next));
-      return { soundVolume: next };
+      localStorage.setItem('masterVolume', String(next));
+      return { soundVolume: next, masterVolume: next };
+    });
+  },
+  setMute: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.mute) : val;
+      localStorage.setItem('soundMute', String(next));
+      localStorage.setItem('soundEffects', String(!next));
+      return { mute: next, soundEffects: !next };
+    });
+  },
+  setMasterVolume: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.masterVolume) : val;
+      localStorage.setItem('masterVolume', String(next));
+      localStorage.setItem('soundVolume', String(next));
+      return { masterVolume: next, soundVolume: next };
+    });
+  },
+  setSfxVolume: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.sfxVolume) : val;
+      localStorage.setItem('sfxVolume', String(next));
+      return { sfxVolume: next };
+    });
+  },
+  setMusicVolume: (val) => {
+    set((state) => {
+      const next = typeof val === 'function' ? val(state.musicVolume) : val;
+      localStorage.setItem('musicVolume', String(next));
+      return { musicVolume: next };
     });
   },
   setHighContrast: (val) => {
@@ -142,6 +186,14 @@ export function useSettings() {
     setSoundEffects: store.setSoundEffects,
     soundVolume: store.soundVolume,
     setSoundVolume: store.setSoundVolume,
+    mute: store.mute,
+    setMute: store.setMute,
+    masterVolume: store.masterVolume,
+    setMasterVolume: store.setMasterVolume,
+    sfxVolume: store.sfxVolume,
+    setSfxVolume: store.setSfxVolume,
+    musicVolume: store.musicVolume,
+    setMusicVolume: store.setMusicVolume,
     highContrast: store.highContrast,
     setHighContrast: store.setHighContrast,
     textScaling: store.textScaling,

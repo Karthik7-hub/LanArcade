@@ -25,6 +25,15 @@ export interface GameManifest {
   description?: string;
   supportsHaptics?: boolean;
   hapticProfile?: string;
+  preferredOrientation?: 'portrait' | 'landscape';
+  supportedOrientations?: ('portrait' | 'landscape')[];
+  displayOrder?: number;
+  featured?: boolean;
+  hidden?: boolean;
+  comingSoon?: boolean;
+  accentColor?: string;
+  accentDark?: string;
+  badgeLabel?: string;
 }
 
 export type RoomStatus = 'waiting' | 'active' | 'finished';

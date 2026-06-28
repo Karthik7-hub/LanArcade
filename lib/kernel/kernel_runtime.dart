@@ -92,7 +92,7 @@ class KernelRuntime implements KernelContext {
     _router.register('game.action', GameActionHandler());
   }
 
-  Future<void> start(String shellAssetsPath) async {
+  Future<void> start(String shellAssetsPath, {Duration pingInterval = const Duration(seconds: 30)}) async {
     if (_isRunning) return;
 
     _statsController.add({'log': 'SERVER_STARTING', 'status': 'starting'});
@@ -216,6 +216,10 @@ class KernelRuntime implements KernelContext {
     // WebSocket Handler
     final wsHandler =
         webSocketHandler((WebSocketChannel channel, dynamic protocol) {
+      if (!_isRunning || KernelManager().status == 'STOPPING') {
+        channel.sink.close();
+        return;
+      }
       final connectionId = _uuid.v4();
       connectionManager.addConnection(connectionId, channel);
 
@@ -245,7 +249,7 @@ class KernelRuntime implements KernelContext {
           _handleDisconnect(connectionId);
         },
       );
-    });
+    }, pingInterval: pingInterval);
 
     router.get('/ws', wsHandler);
 
@@ -274,11 +278,13 @@ class KernelRuntime implements KernelContext {
         'bind': '0.0.0.0:${KernelManager.serverPort}',
       });
     } catch (e) {
+      _isRunning = false;
       _statsController.add({
         'status': 'error',
         'log': 'SERVER_FAILED: $e',
         'error': e.toString(),
       });
+      rethrow;
     }
   }
 

@@ -1,5 +1,8 @@
 const HAPTIC_PATTERNS: Record<string, number[]> = {
   button: [10],
+  click: [10],
+  selection: [15],
+  heavy: [40],
   notification: [15, 30, 15],
   success: [20, 40, 20],
   error: [40, 40, 80],

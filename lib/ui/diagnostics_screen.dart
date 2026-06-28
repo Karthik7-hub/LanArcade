@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 import '../kernel/kernel_manager.dart';
 import 'theme.dart';
 
@@ -13,7 +13,7 @@ class DiagnosticsScreen extends StatefulWidget {
 }
 
 class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
-  static final TextStyle _logTextStyle = GoogleFonts.firaCode(
+  static final TextStyle _logTextStyle = ArcadeFonts.firaCode(
     fontSize: 12,
     height: 1.4,
   );
@@ -23,6 +23,15 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   String _status = 'OFFLINE';
   StreamSubscription? _subscription;
   Timer? _logFlushTimer;
+
+  Timer? _metricsTimer;
+  Map<String, dynamic> _diagInfo = {};
+  Map<String, dynamic> _lockStatus = {
+    'serviceRunning': false,
+    'wakeLock': false,
+    'wifiLock': false,
+    'multicastLock': false,
+  };
 
   @override
   void initState() {
@@ -42,6 +51,22 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         }
       }
     });
+
+    _loadMetrics();
+    _metricsTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _loadMetrics();
+    });
+  }
+
+  void _loadMetrics() async {
+    final info = widget.kernel.getDiagnosticsInfo();
+    final locks = await widget.kernel.getNativeServiceStatus();
+    if (mounted) {
+      setState(() {
+        _diagInfo = info;
+        _lockStatus = locks;
+      });
+    }
   }
 
   void _startFlushTimer() {
@@ -72,7 +97,187 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   void dispose() {
     _subscription?.cancel();
     _logFlushTimer?.cancel();
+    _metricsTimer?.cancel();
     super.dispose();
+  }
+
+  Widget _buildMetricsDashboard() {
+    final uptime = _diagInfo['uptime'] as Duration? ?? Duration.zero;
+    final hours = uptime.inHours.toString().padLeft(2, '0');
+    final minutes = (uptime.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (uptime.inSeconds % 60).toString().padLeft(2, '0');
+
+    final openSockets = _diagInfo['openSockets'] ?? 0;
+    final identifiedPlayers = _diagInfo['identifiedPlayers'] ?? 0;
+    final activeRooms = _diagInfo['activeRooms'] ?? 0;
+    final mDNSState = _diagInfo['mDNSState'] ?? 'Inactive';
+
+    final wakeLock = _lockStatus['wakeLock'] ?? false;
+    final wifiLock = _lockStatus['wifiLock'] ?? false;
+    final multicastLock = _lockStatus['multicastLock'] ?? false;
+
+    final bool isLive = _status == 'RUNNING';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ArcadeCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isLive ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _status,
+                      style: ArcadeFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        color: isLive ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
+                        fontSize: 13,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Uptime: $hours:$minutes:$seconds',
+                  style: ArcadeFonts.firaCode(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: ArcadeTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(color: Colors.white10, height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMetricTile(
+                    'SOCKETS',
+                    '$openSockets',
+                    Icons.connect_without_contact_rounded,
+                  ),
+                ),
+                Expanded(
+                  child: _buildMetricTile(
+                    'PLAYERS',
+                    '$identifiedPlayers',
+                    Icons.people_alt_rounded,
+                  ),
+                ),
+                Expanded(
+                  child: _buildMetricTile(
+                    'ROOMS',
+                    '$activeRooms',
+                    Icons.videogame_asset_rounded,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(color: Colors.white10, height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'mDNS Discovery:',
+                  style: ArcadeFonts.plusJakartaSans(fontSize: 12, color: ArcadeTheme.textSecondary),
+                ),
+                Text(
+                  mDNSState,
+                  style: ArcadeFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: mDNSState == 'Registered' ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'NATIVE WAKELOCKS',
+              style: ArcadeFonts.plusJakartaSans(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: ArcadeTheme.textSecondary,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildLockBadge('WakeLock', wakeLock),
+                const SizedBox(width: 8),
+                _buildLockBadge('WifiLock', wifiLock),
+                const SizedBox(width: 8),
+                _buildLockBadge('MulticastLock', multicastLock),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricTile(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: ArcadeTheme.textSecondary, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: ArcadeFonts.firaCode(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        Text(
+          label,
+          style: ArcadeFonts.plusJakartaSans(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: ArcadeTheme.textSecondary,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLockBadge(String label, bool active) {
+    final color = active ? ArcadeTheme.successColor : ArcadeTheme.errorColor;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Center(
+          child: Text(
+            label.toUpperCase(),
+            style: ArcadeFonts.plusJakartaSans(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildLogLine(String log) {
@@ -93,52 +298,6 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     );
   }
 
-  Widget _buildStatusHeader() {
-    final bool isLive = _status == 'RUNNING';
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ArcadeCard(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'SERVER STATUS',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: ArcadeTheme.textSecondary,
-                letterSpacing: 1.2,
-              ),
-            ),
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isLive ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _status,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800,
-                    color: isLive ? ArcadeTheme.successColor : ArcadeTheme.errorColor,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,7 +305,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       appBar: AppBar(
         title: Text(
           'SERVER LOGS',
-          style: GoogleFonts.blackOpsOne(
+          style: ArcadeFonts.blackOpsOne(
             fontSize: 20,
             letterSpacing: 1.5,
             color: ArcadeTheme.primaryColor,
@@ -164,12 +323,12 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStatusHeader(),
+            _buildMetricsDashboard(),
             Padding(
               padding: const EdgeInsets.only(left: 20, top: 16, bottom: 8),
               child: Text(
                 'SERVER EVENTS',
-                style: GoogleFonts.plusJakartaSans(
+                style: ArcadeFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: ArcadeTheme.textSecondary,
@@ -190,7 +349,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     ? Center(
                         child: Text(
                           'No logs recorded yet.',
-                          style: GoogleFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 13),
+                          style: ArcadeFonts.plusJakartaSans(color: ArcadeTheme.textSecondary, fontSize: 13),
                         ),
                       )
                     : ListView.builder(

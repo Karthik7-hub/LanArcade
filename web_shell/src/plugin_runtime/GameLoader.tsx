@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useStore } from '../shell/store';
 import { wsClient } from '../shell/WebSocketClient';
 import { HapticManager } from './HapticManager';
+import { audioManager } from './AudioManager';
 
 interface GameLoaderProps {
     onOpenSettings: () => void;
@@ -9,6 +10,22 @@ interface GameLoaderProps {
 
 const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
     const { room } = useStore();
+
+    useEffect(() => {
+        if (!room?.game?.id) return;
+        
+        const gameSounds: Record<string, string[]> = {
+            ludo: ['capture', 'hop', 'roll', 'win'],
+            uno: ['draw', 'penalty', 'play', 'reverse', 'skip', 'start', 'swap', 'turn', 'win'],
+            carrom: ['coin_hit', 'pocket', 'striker', 'win'],
+        };
+        const sounds = gameSounds[room.game.id];
+        if (sounds) {
+            audioManager.preloadGameSounds(room.game.id, sounds).catch(err => {
+                console.warn(`[Audio] Failed to preload sound assets for game ${room.game.id}:`, err);
+            });
+        }
+    }, [room?.game?.id]);
 
     useEffect(() => {
         let isReady = false;
@@ -45,6 +62,16 @@ const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
                         HapticManager.trigger(msg.hapticType, true);
                     } else {
                         console.warn(`[Haptics] Game "${room?.game?.name}" requested haptic "${msg.hapticType}" but supportsHaptics is false/missing in manifest.`);
+                    }
+                    break;
+                case 'arcade:play_sound':
+                    if (room?.game?.id) {
+                        const uiSounds = ['click', 'success', 'error', 'nav', 'join', 'leave', 'ready', 'countdown'];
+                        if (uiSounds.includes(msg.soundName)) {
+                            audioManager.playUI(msg.soundName as any);
+                        } else {
+                            audioManager.play(room.game.id, msg.soundName);
+                        }
                     }
                     break;
             }
@@ -95,7 +122,7 @@ const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
         }}>
             {/* Floating Settings Gear Icon */}
             <button
-                onClick={onOpenSettings}
+                onClick={() => { onOpenSettings(); audioManager.playUI('click'); }}
                 style={{
                     position: 'absolute',
                     top: '12px',
@@ -133,7 +160,7 @@ const GameLoader: React.FC<GameLoaderProps> = ({ onOpenSettings }) => {
             <iframe
                 id="game-frame"
                 src={gameUrl}
-                sandbox="allow-scripts"
+                sandbox="allow-scripts allow-same-origin"
                 style={{
                     width: '100%',
                     height: '100%',

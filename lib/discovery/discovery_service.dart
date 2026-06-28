@@ -11,32 +11,20 @@ class DiscoveryService {
   Registration? _registration;
   String _currentName = "Main Arcade";
   int _currentPort = KernelManager.serverPort;
-  int _currentPlayers = 0;
   bool _isRegistering = false;
-  bool _pendingUpdate = false;
+
+  bool get isRegistered => _registration != null;
 
   Future<void> start(String arcadeName, int port) async {
+    if (_registration != null || _isRegistering) return;
+    _isRegistering = true;
     _currentName = arcadeName;
     _currentPort = port;
-    await _registerService();
-  }
-
-  Future<void> updatePlayersCount(int count) async {
-    if (_currentPlayers == count) return;
-    _currentPlayers = count;
-    _pendingUpdate = true;
-    await _triggerUpdate();
-  }
-
-  Future<void> _triggerUpdate() async {
-    if (_isRegistering) return;
-    _isRegistering = true;
-    while (_pendingUpdate) {
-      _pendingUpdate = false;
-      await stop();
+    try {
       await _registerService();
+    } finally {
+      _isRegistering = false;
     }
-    _isRegistering = false;
   }
 
   Future<void> _registerService() async {
@@ -47,11 +35,12 @@ class DiscoveryService {
         port: _currentPort,
         txt: {
           'version': utf8.encode('1.0.0'),
-          'players': utf8.encode(_currentPlayers.toString()),
         },
       ));
     } catch (e) {
       debugPrint("mDNS Registration failed: $e");
+      _registration = null;
+      rethrow;
     }
   }
 
@@ -60,7 +49,7 @@ class DiscoveryService {
       try {
         await unregister(_registration!);
       } catch (e) {
-        // MDNS stack unregistration occasionally throws; swallow it to avoid hanging shutdown
+        debugPrint("mDNS Unregistration error (swallowed): $e");
       }
       _registration = null;
     }

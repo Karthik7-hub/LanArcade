@@ -211,6 +211,14 @@
    HOME SCREEN — Two-Panel Layout
    ===================================================== */
 
+.home-header-bar {
+  display: none;
+}
+
+.home-panel-header-desktop {
+  display: block;
+}
+
 .home-screen {
   height: 100vh;
   width: 100%;
@@ -724,7 +732,7 @@
 }
 
 .portrait-overlay {
-  display: none;
+  display: flex;
   position: fixed;
   inset: 0;
   background: radial-gradient(ellipse at center, var(--bg-secondary) 0%, var(--bg-primary) 100%);
@@ -735,12 +743,8 @@
   text-align: center;
   padding: var(--space-l);
   gap: 0;
-}
-
-@media (orientation: portrait) {
-  .portrait-overlay {
-    display: flex;
-  }
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .portrait-overlay-icon-wrap {
@@ -844,6 +848,77 @@
   text-align: center !important;
   letter-spacing: 1px !important;
 }
+
+.lobby-copy-btn-new {
+  width: 100% !important;
+  padding: 10px 14px !important;
+  background: rgba(59, 130, 246, 0.05) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-m) !important;
+  font-weight: 800 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.5px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.lobby-copy-btn-new:hover {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 12px var(--primary-glow) !important;
+}
+
+.lobby-btn-leave-new {
+  width: 100% !important;
+  padding: 10px 14px !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  color: var(--danger) !important;
+  border-radius: var(--radius-m) !important;
+  font-weight: 800 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.5px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.lobby-btn-leave-new:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.15) !important;
+}
+
+.game-select-input-new {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-m) !important;
+  color: var(--text-primary) !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  outline: none !important;
+  cursor: pointer !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.game-select-input-new:hover {
+  border-color: var(--border-hover) !important;
+}
+
+.game-select-input-new:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 8px var(--primary-glow) !important;
+}
+
 
 .dashboard-tabs {
   display: flex !important;
@@ -1030,3 +1105,546 @@
     background: rgba(13, 16, 26, 0.95) !important;
   }
 }
+
+/* =====================================================
+   MOBILE PORTRAIT CUSTOM STYLES
+   ===================================================== */
+
+/* ---- PORTRAIT HOME SCREEN ---- */
+.home-screen.is-portrait {
+  height: 100vh;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.home-screen.is-portrait .home-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.home-screen.is-portrait .home-portrait-settings-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  color: var(--text-muted);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.home-screen.is-portrait .home-portrait-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.home-screen.is-portrait .home-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 24px;
+  overflow: visible;
+  height: auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.home-screen.is-portrait .home-left-panel {
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.home-screen.is-portrait .home-panel-header-desktop {
+  display: none;
+}
+
+.home-screen.is-portrait .home-profile-card.portrait-profile {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 12px 16px;
+}
+
+.home-screen.is-portrait .home-join-card.portrait-join {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+  min-height: auto;
+}
+
+.home-screen.is-portrait .portrait-join-btn {
+  padding: 12px 20px !important;
+  border-radius: 10px !important;
+  width: auto !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+
+.home-screen.is-portrait .home-right-panel {
+  height: auto;
+  overflow: visible;
+  background: transparent;
+  width: 100%;
+}
+
+.home-screen.is-portrait .home-games-header {
+  padding: 8px 0;
+}
+
+.home-screen.is-portrait .home-game-scroll-area {
+  padding: 0;
+  overflow: visible;
+}
+
+.home-screen.is-portrait .home-game-card.portrait-featured-card {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.home-screen.is-portrait .home-portrait-game-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.home-screen.is-portrait .home-game-card.portrait-grid-card {
+  width: 100%;
+  aspect-ratio: auto;
+}
+
+/* ---- PORTRAIT LOBBY SCREEN ---- */
+.lobby-portrait-container {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.lobby-portrait-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(13, 16, 26, 0.7);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.lobby-portrait-back-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lobby-portrait-back-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.lobby-portrait-game-select {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  margin: 0 10px;
+}
+
+.lobby-portrait-game-name {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow: 0 0 8px var(--primary-glow);
+}
+
+.game-select-input-new.portrait-select {
+  width: 100%;
+  max-width: 160px;
+  padding: 6px 10px !important;
+  font-size: 11px !important;
+  border-radius: 8px !important;
+}
+
+.lobby-portrait-code-btn {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--primary);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.lobby-portrait-code-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.copied-tooltip {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--success);
+  color: #fff;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.lobby-portrait-tabs {
+  display: flex;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+}
+
+.lobby-portrait-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.lobby-portrait-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lobby-portrait-tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px 6px 0 0;
+}
+
+.lobby-portrait-tab-btn.active.active-green {
+  color: var(--success);
+  border-bottom-color: var(--success);
+}
+
+.lobby-portrait-tab-btn.active.active-pink {
+  color: var(--secondary);
+  border-bottom-color: var(--secondary);
+}
+
+.lobby-portrait-tab-btn.active.active-indigo {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.lobby-portrait-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+}
+
+.portrait-pane-wrap {
+  animation: modalOpen var(--transition-fast) forwards;
+}
+
+.portrait-players-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.portrait-player-chip {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.portrait-player-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+}
+
+.portrait-player-chip.spectator-chip {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.portrait-spectator-avatar {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-item.portrait-rank-item {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.01) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 10px !important;
+}
+
+.portrait-rules-vertical {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.portrait-rule-card {
+  width: 100% !important;
+}
+
+.portrait-save-btn {
+  width: 100% !important;
+  justify-content: center !important;
+  padding: 12px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+}
+
+.lobby-portrait-footer-actions {
+  background: rgba(10, 14, 23, 0.85);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  backdrop-filter: blur(12px);
+}
+
+.portrait-lobby-action-btn {
+  padding: 14px !important;
+  font-size: 15px !important;
+  border-radius: 12px !important;
+}
+
+/* ---- PORTRAIT SYSTEM SETTINGS MODAL ---- */
+.console-settings-card.portrait-modal {
+  width: 95% !important;
+  height: 85vh !important;
+  max-height: none !important;
+}
+
+.console-settings-layout.portrait-console {
+  flex-direction: column !important;
+}
+
+.console-settings-layout.portrait-console .console-settings-sidebar {
+  width: 100% !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  flex-direction: row !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 8px 12px !important;
+  gap: 8px !important;
+}
+
+.console-settings-layout.portrait-console .console-settings-sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+.console-settings-layout.portrait-console .console-settings-sidebar-btn {
+  padding: 8px 12px !important;
+  font-size: 10px !important;
+  border-left: none !important;
+  border-bottom: 3px solid transparent !important;
+  border-radius: 4px 4px 0 0 !important;
+  white-space: nowrap !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.console-settings-layout.portrait-console .console-settings-sidebar-btn.active {
+  border-bottom-color: var(--primary) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--primary) !important;
+}
+
+.console-settings-layout.portrait-console .console-settings-content {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 16px !important;
+}
+
+/* ---- PORTRAIT LOBBY SCREEN RESPONSIVE Refactor ---- */
+.lobby-screen.is-portrait .waiting-container {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  background: radial-gradient(ellipse at center, var(--bg-secondary) 0%, var(--bg-primary) 100%) !important;
+}
+
+.lobby-screen.is-portrait .lobby-dashboard-left {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  border-right: none !important;
+  background: transparent !important;
+  overflow: visible !important;
+  height: auto !important;
+}
+
+.lobby-screen.is-portrait .lobby-dashboard-right {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  height: auto !important;
+}
+
+/* Visibility toggles for LobbyScreen */
+.lobby-screen.is-portrait .lobby-portrait-header {
+  display: flex !important;
+}
+
+.lobby-screen.is-portrait .dashboard-room-section,
+.lobby-screen.is-portrait .dashboard-start-section,
+.lobby-screen.is-portrait .dashboard-leave-section,
+.lobby-screen.is-portrait .dashboard-right-header {
+  display: none !important;
+}
+
+.lobby-screen.is-portrait .lobby-portrait-footer-actions {
+  display: flex !important;
+}
+
+.lobby-screen.is-landscape .lobby-portrait-header,
+.lobby-screen.is-landscape .lobby-portrait-footer-actions {
+  display: none !important;
+}
+
+/* Morph vertical tabs to horizontal layout in portrait */
+.lobby-screen.is-portrait .dashboard-tabs {
+  display: flex !important;
+  flex-direction: row !important;
+  overflow-x: auto !important;
+  white-space: nowrap !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  padding: 8px !important;
+  border-bottom: 1px solid var(--border) !important;
+  gap: 6px !important;
+  flex: none !important;
+  margin-bottom: 0 !important;
+}
+
+.lobby-screen.is-portrait .dashboard-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.lobby-screen.is-portrait .lobby-tab-btn-vertical {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-left: none !important;
+  color: var(--text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  padding: 6px 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: all var(--transition-fast) !important;
+  border-radius: 0 !important;
+  white-space: nowrap !important;
+}
+
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active {
+  color: var(--primary) !important;
+  border-bottom-color: var(--primary) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active.shadow-pink,
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active.active-pink {
+  color: var(--secondary) !important;
+  border-bottom-color: var(--secondary) !important;
+}
+
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active.shadow-green,
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active.active-green {
+  color: var(--success) !important;
+  border-bottom-color: var(--success) !important;
+}
+
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active.shadow-indigo,
+.lobby-screen.is-portrait .lobby-tab-btn-vertical.active.active-indigo {
+  color: var(--primary) !important;
+  border-bottom-color: var(--primary) !important;
+}
+

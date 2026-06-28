@@ -1,0 +1,67 @@
+{
+  "id": "carrom",
+  "name": "Carrom Club",
+  "version": "1.0.0",
+  "sdkVersion": "1.0.0",
+  "author": "LAN Arcade",
+  "description": "Premium multiplayer carrom board with real-time synchronized physics.",
+  "minPlayers": 2,
+  "maxPlayers": 4,
+  "permissions": ["private-state", "timers"],
+  "supportsHaptics": true,
+  "hapticProfile": "physics-game",
+  "entry": "index.html",
+  "preferredOrientation": "portrait",
+  "supportedOrientations": ["portrait"],
+  "displayOrder": 4,
+  "featured": true,
+  "hidden": false,
+  "comingSoon": false,
+  "accentColor": "#eab308",
+  "accentDark": "#a16207",
+  "badgeLabel": "BOARD GAME",
+  "estimatedMatchLength": "10-15 mins",
+  "difficulty": "medium",
+  "supportsReconnect": true,
+  "supportsSpectators": true,
+  "supportsAudio": true,
+  "supportsPause": true,
+  "supportsResume": true,
+  "thumbnail": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231e293b'/%3E%3Cstop offset='100%25' stop-color='%230f172a'/%3E%3C/linearGradient%3E%3ClinearGradient id='wood' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2378350f'/%3E%3Cstop offset='100%25' stop-color='%23451a03'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='320' height='180' fill='url(%23bg)'/%3E%3Cg transform='translate(100, 30)'%3E%3Crect x='0' y='0' width='120' height='120' rx='8' fill='url(%23wood)' stroke='%231e293b' stroke-width='4'/%3E%3Crect x='10' y='10' width='100' height='100' fill='%23fef3c7' rx='4'/%3E%3Ccircle cx='60' cy='60' r='18' fill='none' stroke='%239a3412' stroke-width='2'/%3E%3Ccircle cx='60' cy='60' r='5' fill='%23dc2626'/%3E%3Ccircle cx='60' cy='60' r='10' fill='none' stroke='%23dc2626' stroke-width='1'/%3E%3Ccircle cx='35' cy='60' r='4' fill='%231e293b'/%3E%3Ccircle cx='85' cy='60' r='4' fill='%231e293b'/%3E%3Ccircle cx='60' cy='35' r='4' fill='%231e293b'/%3E%3Ccircle cx='60' cy='85' r='4' fill='%231e293b'/%3E%3C/g%3E%3C/svg%3E",
+  "settingsSchema": {
+    "preset": {
+      "type": "select",
+      "label": "Game Mode",
+      "description": "Ruleset for pocketing and points",
+      "default": "classic",
+      "options": [
+        {"value": "classic", "label": "Classic Carrom (Queen Cover required)"},
+        {"value": "points", "label": "Points Carrom (Black: 1pt, White: 2pt, Queen: 3pt)"}
+      ],
+      "values": {
+        "classic": {
+          "queenRequired": true,
+          "boardFriction": 0.02
+        },
+        "points": {
+          "queenRequired": false,
+          "boardFriction": 0.02
+        }
+      }
+    },
+    "boardFriction": {
+      "type": "number",
+      "label": "Board Friction",
+      "description": "Sliding friction coefficient of the board (0.01 - 0.05)",
+      "default": 0.02,
+      "min": 0.01,
+      "max": 0.05
+    },
+    "queenRequired": {
+      "type": "boolean",
+      "label": "Queen Cover Required",
+      "description": "Must sink another piece right after pocketing the Queen",
+      "default": true
+    }
+  }
+}

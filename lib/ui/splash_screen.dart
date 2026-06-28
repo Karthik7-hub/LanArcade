@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'arcade_fonts.dart';
 import 'admin_dashboard.dart';
 import 'theme.dart';
 
@@ -58,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 32),
             Text(
               'LAN ARCADE',
-              style: GoogleFonts.blackOpsOne(
+              style: ArcadeFonts.blackOpsOne(
                 fontSize: 36,
                 letterSpacing: 4,
                 color: ArcadeTheme.primaryColor,
@@ -77,7 +77,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 8),
             Text(
               'YOUR PORTABLE ARCADE SYSTEM',
-              style: GoogleFonts.plusJakartaSans(
+              style: ArcadeFonts.plusJakartaSans(
                 color: ArcadeTheme.textSecondary,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,

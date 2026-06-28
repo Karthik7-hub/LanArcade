@@ -1,0 +1,2696 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Carrom Masters - Premium Standalone</title>
+    <style>
+        /* Offline Fonts Configuration */
+        @font-face {
+            font-family: 'Montserrat';
+            font-style: normal;
+            font-weight: 700;
+            font-display: swap;
+            src: url('/fonts/montserrat-700.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Montserrat';
+            font-style: normal;
+            font-weight: 900;
+            font-display: swap;
+            src: url('/fonts/montserrat-900.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url('/fonts/inter-latin-400-normal.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Inter';
+            font-style: normal;
+            font-weight: 600;
+            font-display: swap;
+            src: url('/fonts/inter-latin-600-normal.woff2') format('woff2');
+        }
+
+        :root {
+            /* Premium Palette Design Tokens */
+            --bg-dark: #070301;
+            --surface-ivory: #faf6e8;
+            --surface-dim: #dbcaa0;
+            --walnut-primary: #200e05;
+            --walnut-container: #2d160a;
+            --tournament-red: #ab1213;
+            --accent-charcoal: #110601;
+            --outline-color: rgba(212, 175, 55, 0.15);
+            --gold-accent: #d4af37;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #351c0e 0%, var(--bg-dark) 100%);
+            color: #faf6e8;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-sizing: border-box;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        @media (min-width: 600px) {
+            #game-container {
+                padding: 20px;
+                gap: 16px;
+            }
+        }
+
+        /* --- STABLE FIXED BOARD WRAPPER --- */
+        #board-wrapper {
+            position: relative;
+            box-shadow: 
+                0 20px 50px rgba(0, 0, 0, 0.95),
+                inset 0 0 10px rgba(255, 255, 255, 0.15);
+            overflow: hidden; /* Nothing overlaps board surface */
+            box-sizing: border-box;
+            background: var(--walnut-primary);
+            border-radius: 24px;
+            display: none;
+            /* Perfectly static */
+            transform: none !important;
+            transition: none !important;
+            border: 4px solid #110601;
+        }
+
+        #static-canvas,
+        #dynamic-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 20px;
+        }
+
+        #static-canvas {
+            z-index: 10;
+        }
+
+        #dynamic-canvas {
+            z-index: 20;
+        }
+
+        #touch-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            cursor: crosshair;
+        }
+
+        /* --- TURN STATE HEADER BAR --- */
+        #turn-banner {
+            width: 100%;
+            max-width: 440px;
+            background: linear-gradient(180deg, #2d160a 0%, #150a04 100%);
+            border: 1.5px solid var(--gold-accent);
+            border-radius: 12px;
+            padding: 8px 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 50;
+            box-sizing: border-box;
+        }
+
+        .turn-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .turn-label {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .timer-value {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 13px;
+            color: #ef4444;
+        }
+
+        .timer-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.55);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #timer-bar {
+            height: 100%;
+            background: #22c55e;
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+
+        /* --- SEPARATED TOP & BOTTOM SCORECARD ROWS --- */
+        .hud-row {
+            width: 100%;
+            max-width: 440px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            z-index: 50;
+            box-sizing: border-box;
+        }
+
+        .hud-card {
+            position: relative;
+            background: linear-gradient(135deg, #2d160a 0%, #150a04 100%);
+            border: 1.5px solid var(--gold-accent);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            z-index: 40;
+            flex: 1;
+            max-width: 160px;
+            height: 38px;
+            box-sizing: border-box;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .hud-card.active {
+            border-color: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+            background: linear-gradient(135deg, #3d200c 0%, #1c0e06 100%);
+        }
+
+        .hud-avatar-wrapper {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #110601;
+            border: 1.2px solid var(--gold-accent);
+        }
+
+        .hud-card.active .hud-avatar-wrapper {
+            border-color: #ffffff;
+        }
+
+        .hud-avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .hud-color-badge {
+            position: absolute;
+            bottom: 0px;
+            right: 0px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            border: 1px solid var(--bg-dark);
+        }
+
+        .badge-red { background: var(--tournament-red); }
+        .badge-green { background: #22c55e; }
+        .badge-yellow { background: #eab308; }
+        .badge-blue { background: #3b82f6; }
+
+        .hud-info {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .hud-name {
+            font-size: 8px;
+            font-weight: 700;
+            color: var(--surface-dim);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60px;
+        }
+
+        .hud-card.active .hud-name {
+            color: #ffffff;
+        }
+
+        .hud-score {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 12px;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        /* --- CONTROL PANEL CONTROLS --- */
+        #controls-container {
+            width: 100%;
+            max-width: 440px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 50;
+            box-sizing: border-box;
+        }
+
+        .striker-slider-container {
+            width: 100%;
+            background: linear-gradient(180deg, #2d160a 0%, #150a04 100%);
+            border: 1.5px solid var(--gold-accent);
+            border-radius: 9999px;
+            padding: 6px 12px;
+            box-shadow: 
+                inset 0 2px 4px rgba(0, 0, 0, 0.6),
+                0 4px 10px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-sizing: border-box;
+        }
+
+        .striker-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .striker-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffffff 0%, #d4af37 60%, #8a6f27 100%);
+            border: 1.5px solid #1a0f02;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
+            cursor: pointer;
+        }
+
+        .slider-icon {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+
+        #aim-tip {
+            background: rgba(21, 10, 4, 0.6);
+            border: 1px solid var(--outline-color);
+            border-radius: 8px;
+            padding: 5px;
+            font-size: 9px;
+            color: var(--surface-dim);
+            text-align: center;
+            line-height: 1.3;
+            backdrop-filter: blur(8px);
+        }
+
+        /* --- MENU OVERLAYS --- */
+        #ui-layer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .menu-box {
+            pointer-events: auto;
+            background: rgba(26, 14, 6, 0.96);
+            border: 2px solid var(--gold-accent);
+            padding: 20px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95);
+            width: 90%;
+            max-width: 380px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            color: var(--surface-ivory);
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #ffd700 0%, #d4af37 100%);
+            color: #201107;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid #ffe58a;
+            box-shadow: 0 4px 0 #8a6f27;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 12px;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .btn:hover {
+            transform: translateY(1px);
+            box-shadow: 0 3px 0 #8a6f27;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #8a6f27;
+        }
+
+        .menu-title {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 26px;
+            margin: 0 0 4px 0;
+            color: var(--gold-accent);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .menu-subtitle {
+            font-size: 9px;
+            font-weight: 700;
+            color: #a89475;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin: 0 0 16px 0;
+        }
+
+        .menu-form-group {
+            background: rgba(10, 5, 2, 0.75);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .form-field {
+            margin-bottom: 10px;
+        }
+
+        .form-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 10px;
+            font-weight: 800;
+            color: #d4af37;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 6px 10px;
+            background: #080402;
+            border: 1px solid #3d200c;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 12px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .form-select:focus {
+            border-color: var(--gold-accent);
+        }
+
+        .name-inputs-section {
+            margin-top: 12px;
+            border-top: 1px solid #3d200c;
+            padding-top: 8px;
+        }
+
+        .player-name-field {
+            margin-bottom: 6px;
+        }
+
+        .player-name-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .player-name-label {
+            display: block;
+            font-size: 9px;
+            font-weight: 800;
+            margin-bottom: 3px;
+            color: rgba(212, 175, 55, 0.85);
+        }
+
+        .player-name-input {
+            width: 100%;
+            padding: 5px 8px;
+            background: #080402;
+            border: 1px solid #3d200c;
+            border-left: 4px solid #334155;
+            border-radius: 4px;
+            color: #ffffff;
+            font-size: 11px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .player-name-input.border-red-500 { border-left-color: var(--tournament-red); }
+        .player-name-input.border-green-500 { border-left-color: #22c55e; }
+        .player-name-input.border-yellow-500 { border-left-color: #eab308; }
+        .player-name-input.border-blue-500 { border-left-color: #3b82f6; }
+
+        .win-title {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 24px;
+            color: var(--gold-accent);
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+        }
+
+        .win-desc {
+            font-size: 13px;
+            color: #e2e8f0;
+            margin: 0 0 20px 0;
+            line-height: 1.4;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container">
+        <!-- Turn Header panel -->
+        <div id="turn-banner">
+            <div class="turn-content">
+                <span class="turn-label" id="active-player-name">YOUR SHOT</span>
+                <span class="timer-value" id="timer-text">30s</span>
+            </div>
+            <div class="timer-bar-bg">
+                <div id="timer-bar"></div>
+            </div>
+        </div>
+
+        <!-- Top HUD (Opponent scorecards) -->
+        <div id="top-hud" class="hud-row">
+            <div class="hud-card hud-card-1" id="hud-card-1" style="display: none;">
+                <div class="hud-avatar-wrapper">
+                    <img class="hud-avatar" src="" alt="Avatar">
+                    <span class="hud-color-badge badge-green"></span>
+                </div>
+                <div class="hud-info">
+                    <div class="hud-name">Player 2</div>
+                    <div class="hud-score">0 pts</div>
+                </div>
+            </div>
+            <div class="hud-card hud-card-2" id="hud-card-2" style="display: none;">
+                <div class="hud-avatar-wrapper">
+                    <img class="hud-avatar" src="" alt="Avatar">
+                    <span class="hud-color-badge badge-yellow"></span>
+                </div>
+                <div class="hud-info">
+                    <div class="hud-name">Player 3</div>
+                    <div class="hud-score">0 pts</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stable Fixed Board Wrapper -->
+        <div id="board-wrapper">
+            <!-- Layers -->
+            <canvas id="static-canvas"></canvas>
+            <canvas id="dynamic-canvas"></canvas>
+            <div id="touch-overlay"></div>
+        </div>
+
+        <!-- Bottom HUD (Your scorecard / local player cards) -->
+        <div id="bottom-hud" class="hud-row">
+            <div class="hud-card hud-card-0" id="hud-card-0" style="display: none;">
+                <div class="hud-avatar-wrapper">
+                    <img class="hud-avatar" src="" alt="Avatar">
+                    <span class="hud-color-badge badge-red"></span>
+                </div>
+                <div class="hud-info">
+                    <div class="hud-name">Player 1</div>
+                    <div class="hud-score">0 pts</div>
+                </div>
+            </div>
+            <div class="hud-card hud-card-3" id="hud-card-3" style="display: none;">
+                <div class="hud-avatar-wrapper">
+                    <img class="hud-avatar" src="" alt="Avatar">
+                    <span class="hud-color-badge badge-blue"></span>
+                </div>
+                <div class="hud-info">
+                    <div class="hud-name">Player 4</div>
+                    <div class="hud-score">0 pts</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slider controls -->
+        <div id="controls-container">
+            <div class="striker-slider-container">
+                <span class="slider-icon">👈</span>
+                <input type="range" id="striker-slider" class="striker-slider" min="-230" max="230" value="0" disabled>
+                <span class="slider-icon">👉</span>
+            </div>
+            <div id="aim-tip">
+                💡 Slide to position striker. Pull back from striker to aim & shoot!
+            </div>
+        </div>
+
+        <!-- Overlays -->
+        <div id="ui-layer">
+            <div id="main-menu" class="menu-box">
+                <h1 class="menu-title">PRO CARROM</h1>
+                <p class="menu-subtitle">Premium Tabletop Simulator</p>
+
+                <div class="menu-form-group">
+                    <div class="form-field">
+                        <label class="form-label">Players Count:</label>
+                        <select id="players-select" onchange="onPlayerCountChange()" class="form-select">
+                            <option value="2" selected>2 Players (Opposing Baselines)</option>
+                            <option value="3">3 Players (3-Way Battle)</option>
+                            <option value="4">4 Players (4-Way Free-For-All)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Rules Variant:</label>
+                        <select id="mode-select" class="form-select">
+                            <option value="classic" selected>Classic (Queen Cover required)</option>
+                            <option value="points">Points Mode (Black:1, White:2, Queen:3)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Friction Level:</label>
+                        <select id="friction-select" class="form-select">
+                            <option value="0.02" selected>Tournament Smooth (0.02)</option>
+                            <option value="0.01">Ultra Glossy (0.01)</option>
+                            <option value="0.04">Rough Wood (0.04)</option>
+                        </select>
+                    </div>
+
+                    <div id="name-inputs-container" class="name-inputs-section">
+                        <!-- Filled Dynamically -->
+                    </div>
+                </div>
+
+                <button class="btn w-full" onclick="startMatch()">START MATCH</button>
+            </div>
+
+            <!-- Win Overlay -->
+            <div id="win-overlay" class="menu-box" style="display: none;">
+                <h2 id="win-title" class="win-title">MATCH FINISHED</h2>
+                <p id="win-description" class="win-desc"></p>
+                <button class="btn w-full" onclick="restartMatch()">PLAY AGAIN</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Web Audio API Sound Synthesizer -->
+    <script>
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const ctxClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new ctxClass();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        let lastHitSoundTime = 0;
+        let lastPocketSoundTime = 0;
+
+        function playHitSound(volume = 1.0, pitch = 450) {
+            const now = Date.now();
+            if (now - lastHitSoundTime < 50) return; 
+            lastHitSoundTime = now;
+
+            try {
+                const actx = getAudioContext();
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(pitch, actx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(pitch * 0.25, actx.currentTime + 0.05);
+                
+                gain.gain.setValueAtTime(volume * 0.15, actx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.05);
+                
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                
+                osc.start();
+                osc.stop(actx.currentTime + 0.05);
+            } catch (e) {}
+        }
+
+        function playPocketSound() {
+            const now = Date.now();
+            if (now - lastPocketSoundTime < 150) return;
+            lastPocketSoundTime = now;
+
+            try {
+                const actx = getAudioContext();
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, actx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(240, actx.currentTime + 0.16);
+                
+                gain.gain.setValueAtTime(0.2, actx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.16);
+                
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                
+                osc.start();
+                osc.stop(actx.currentTime + 0.16);
+            } catch (e) {}
+        }
+
+        function playStrikeSound(volume = 1.0) {
+            try {
+                const actx = getAudioContext();
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(320, actx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(70, actx.currentTime + 0.08);
+                
+                gain.gain.setValueAtTime(volume * 0.22, actx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.08);
+                
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                
+                osc.start();
+                osc.stop(actx.currentTime + 0.08);
+            } catch (e) {}
+        }
+
+        // play thud bounce
+        function playThudSound(volume = 1.0) {
+            try {
+                const actx = getAudioContext();
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120, actx.currentTime);
+                osc.frequency.linearRampToValueAtTime(40, actx.currentTime + 0.09);
+                
+                gain.gain.setValueAtTime(volume * 0.25, actx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.09);
+                
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                
+                osc.start();
+                osc.stop(actx.currentTime + 0.09);
+            } catch (e) {}
+        }
+
+        function playFoulSound() {
+            try {
+                const actx = getAudioContext();
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, actx.currentTime);
+                osc.frequency.linearRampToValueAtTime(65, actx.currentTime + 0.22);
+                
+                gain.gain.setValueAtTime(0.15, actx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.22);
+                
+                osc.connect(gain);
+                gain.connect(actx.destination);
+                
+                osc.start();
+                osc.stop(actx.currentTime + 0.22);
+            } catch (e) {}
+        }
+
+        function playWinSound() {
+            try {
+                const actx = getAudioContext();
+                const playNote = (freq, time, duration) => {
+                    const osc = actx.createOscillator();
+                    const gain = actx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, time);
+                    gain.gain.setValueAtTime(0.1, time);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+                    osc.connect(gain);
+                    gain.connect(actx.destination);
+                    osc.start(time);
+                    osc.stop(time + duration);
+                };
+                
+                const now = actx.currentTime;
+                playNote(523.25, now, 0.12);
+                playNote(659.25, now + 0.12, 0.12);
+                playNote(783.99, now + 0.24, 0.12);
+                playNote(1046.50, now + 0.36, 0.35);
+            } catch (e) {}
+        }
+    </script>
+
+    <!-- Vector Physics Engine & High-Quality Rendering Framework -->
+    <script>
+        const staticCanvas = document.getElementById('static-canvas');
+        const staticCtx = staticCanvas.getContext('2d');
+        const dynamicCanvas = document.getElementById('dynamic-canvas');
+        const dynamicCtx = dynamicCanvas.getContext('2d');
+        const touchOverlay = document.getElementById('touch-overlay');
+        const slider = document.getElementById('striker-slider');
+
+        // Baselines and rotations mapping
+        const ANGLES = [0, Math.PI, Math.PI / 2, -Math.PI / 2];
+
+        const fallbackAvatars = [
+            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23ab1213'/><circle cx='50' cy='35' r='20' fill='%23fdfdf0'/><path d='M15 85c0-18 15-25 35-25s35 7 35 25z' fill='%23fdfdf0'/></svg>",
+            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2322c55e'/><circle cx='50' cy='35' r='20' fill='%23fdfdf0'/><path d='M15 85c0-18 15-25 35-25s35 7 35 25z' fill='%23fdfdf0'/></svg>",
+            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23eab308'/><circle cx='50' cy='35' r='20' fill='%23fdfdf0'/><path d='M15 85c0-18 15-25 35-25s35 7 35 25z' fill='%23fdfdf0'/></svg>",
+            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><circle cx='50' cy='35' r='20' fill='%23fdfdf0'/><path d='M15 85c0-18 15-25 35-25s35 7 35 25z' fill='%23fdfdf0'/></svg>"
+        ];
+
+        // Board constants
+        const BOARD_SIZE = 800;
+        const FRAME_BORDER = 48; 
+        const COIN_RADIUS = 15;
+        const STRIKER_RADIUS = 21;
+        const POCKET_RADIUS = 36;
+        
+        // Masses
+        const COIN_MASS = 1.0;
+        const STRIKER_MASS = 3.0;
+
+        const POCKETS = [
+            { x: 52, y: 52 },
+            { x: 748, y: 52 },
+            { x: 52, y: 748 },
+            { x: 748, y: 748 }
+        ];
+
+        const STATE = {
+            MENU: 'menu',
+            PLAYING: 'playing',
+            FINISHED: 'finished'
+        };
+
+        const localState = {
+            status: STATE.MENU,
+            numPlayers: 2,
+            preset: 'classic',
+            players: [],
+            scores: {},
+            currentTurnIndex: 0,
+            
+            striker: { x: 400, y: 640, vx: 0, vy: 0, active: true, angle: 0, w: 0 },
+            coins: [], 
+            particles: [], 
+            
+            simulating: false,
+            shotCooldown: false,
+            winner: null,
+            queenStatus: 'board', 
+            queenPocketedBy: null,
+            pocketedThisTurn: [],
+            timerRemaining: 30,
+            boardFriction: 0.02,
+            queenRequired: true,
+            
+            cameraShake: { x: 0, y: 0, intensity: 0 }
+        };
+
+        // Interaction state
+        let isAiming = false;
+        let aimStart = { x: 0, y: 0 };
+        let aimCurrent = { x: 0, y: 0 };
+        let dragForce = { x: 0, y: 0 };
+
+        // POSITION SLIDER LISTENER
+        slider.addEventListener('input', (e) => {
+            if (localState.status === STATE.PLAYING && !localState.simulating) {
+                handlePositionStriker(parseFloat(e.target.value));
+            }
+        });
+
+        // INPUT EVENT INTERACTION
+        touchOverlay.addEventListener('mousedown', startAim);
+        touchOverlay.addEventListener('mousemove', moveAim);
+        window.addEventListener('mouseup', releaseAim);
+
+        touchOverlay.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) startAim(e.touches[0]);
+        });
+        touchOverlay.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) moveAim(e.touches[0]);
+        });
+        window.addEventListener('touchend', releaseAim);
+
+        function getCanvasMousePos(e) {
+            const rect = dynamicCanvas.getBoundingClientRect();
+            const clientX = (e.clientX - rect.left) / rect.width * BOARD_SIZE;
+            const clientY = (e.clientY - rect.top) / rect.height * BOARD_SIZE;
+
+            const turnIdx = localState.currentTurnIndex;
+            const angle = ANGLES[turnIdx];
+            const dx = clientX - 400;
+            const dy = clientY - 400;
+            const rx = dx * Math.cos(angle) - dy * Math.sin(angle);
+            const ry = dx * Math.sin(angle) + dy * Math.cos(angle);
+            return { x: 400 + rx, y: 400 + ry };
+        }
+
+        function startAim(e) {
+            getAudioContext();
+            if (localState.status !== STATE.PLAYING || localState.simulating || localState.shotCooldown) return;
+
+            const pos = getCanvasMousePos(e);
+            const turnIdx = localState.currentTurnIndex;
+
+            const localPos = globalToLocal(pos.x, pos.y, turnIdx);
+            const localStriker = globalToLocal(localState.striker.x, localState.striker.y, turnIdx);
+
+            const dx = localPos.x - localStriker.x;
+            const dy = localPos.y - localStriker.y;
+            const dist = Math.hypot(dx, dy);
+
+            // Drag starts if touching within range of the striker
+            if (dist < 45) {
+                isAiming = true;
+                aimStart = localStriker;
+                aimCurrent = localPos;
+            }
+        }
+
+        function moveAim(e) {
+            if (!isAiming) return;
+            const pos = getCanvasMousePos(e);
+            const turnIdx = localState.currentTurnIndex;
+            const localPos = globalToLocal(pos.x, pos.y, turnIdx);
+
+            aimCurrent = localPos;
+
+            const dx = aimStart.x - aimCurrent.x;
+            const dy = aimStart.y - aimCurrent.y;
+
+            const forceLen = Math.hypot(dx, dy);
+            const maxForce = 170; 
+            if (forceLen > maxForce) {
+                dragForce.x = (dx / forceLen) * maxForce;
+                dragForce.y = (dy / forceLen) * maxForce;
+            } else {
+                dragForce.x = dx;
+                dragForce.y = dy;
+            }
+        }
+
+        function releaseAim() {
+            if (!isAiming) return;
+            isAiming = false;
+
+            const forceLen = Math.hypot(dragForce.x, dragForce.y);
+            if (forceLen > 15) {
+                const turnIdx = localState.currentTurnIndex;
+                const globalForce = localForceToGlobal(dragForce.x, dragForce.y, turnIdx);
+
+                const speedMultiplier = 5.0;
+                const vxG = globalForce.x * speedMultiplier;
+                const vyG = globalForce.y * speedMultiplier;
+
+                playStrikeSound(Math.min(1.0, forceLen / 170));
+                handleShoot(vxG, vyG);
+            }
+            dragForce = { x: 0, y: 0 };
+        }
+
+        // --- COORDINATES ROTATION SYSTEMS ---
+        function globalToLocal(x, y, playerIdx) {
+            const angle = ANGLES[playerIdx];
+            const dx = x - 400;
+            const dy = y - 400;
+            const rx = dx * Math.cos(-angle) - dy * Math.sin(-angle);
+            const ry = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+            return { x: rx, y: ry };
+        }
+
+        function localToGlobal(lx, ly, playerIdx) {
+            const angle = ANGLES[playerIdx];
+            const rx = lx * Math.cos(angle) - ly * Math.sin(angle);
+            const ry = lx * Math.sin(angle) + ly * Math.cos(angle);
+            return { x: 400 + rx, y: 400 + ry };
+        }
+
+        function localForceToGlobal(fx, fy, playerIdx) {
+            const angle = ANGLES[playerIdx];
+            const rx = fx * Math.cos(angle) - fy * Math.sin(angle);
+            const ry = fx * Math.sin(angle) + fy * Math.cos(angle);
+            return { x: rx, y: ry };
+        }
+
+        // Raycasting for aim prediction
+        function getLineCircleIntersection(sx, sy, dx, dy, cx, cy, cr) {
+            const ocX = cx - sx;
+            const ocY = cy - sy;
+            const len = Math.hypot(dx, dy);
+            if (len === 0) return null;
+
+            const nx = dx / len;
+            const ny = dy / len;
+
+            const proj = ocX * nx + ocY * ny;
+            if (proj < 0) return null;
+
+            const closestX = sx + nx * proj;
+            const closestY = sy + ny * proj;
+            const distSq = (cx - closestX) * (cx - closestX) + (cy - closestY) * (cy - closestY);
+
+            if (distSq < cr * cr) {
+                const offset = Math.sqrt(cr * cr - distSq);
+                const contactDist = proj - offset;
+                if (contactDist < 0) return null;
+                return {
+                    x: sx + nx * contactDist,
+                    y: sy + ny * contactDist,
+                    dist: contactDist
+                };
+            }
+            return null;
+        }
+
+        // --- PARTICLE EMITTER ---
+        function spawnParticles(x, y, color, count = 6) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 20 + Math.random() * 80;
+                localState.particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: color,
+                    alpha: 1.0,
+                    size: 1.5 + Math.random() * 2,
+                    maxLife: 0.3 + Math.random() * 0.4,
+                    life: 0
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = localState.particles.length - 1; i >= 0; i--) {
+                const p = localState.particles[i];
+                p.life += dt;
+                if (p.life >= p.maxLife) {
+                    localState.particles.splice(i, 1);
+                    continue;
+                }
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.alpha = 1.0 - (p.life / p.maxLife);
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+            }
+        }
+
+        // --- GAME LOGIC & TURN SYSTEM ---
+        function handlePositionStriker(localX) {
+            const constrainedX = Math.max(-200, Math.min(200, localX)); 
+            const turnIdx = localState.currentTurnIndex;
+            const angle = ANGLES[turnIdx];
+            const localY = 240; // 640 - 400
+
+            let targetX = 400 + constrainedX * Math.cos(angle) - localY * Math.sin(angle);
+            let targetY = 400 + constrainedX * Math.sin(angle) + localY * Math.cos(angle);
+
+            let isOverlapping = false;
+            localState.coins.forEach(c => {
+                if (!c.active) return;
+                const dx = c.x - targetX;
+                const dy = c.y - targetY;
+                if (Math.hypot(dx, dy) < STRIKER_RADIUS + COIN_RADIUS + 2) {
+                    isOverlapping = true;
+                }
+            });
+
+            if (!isOverlapping) {
+                localState.striker.x = targetX;
+                localState.striker.y = targetY;
+            }
+        }
+
+        function handleShoot(vxG, vyG) {
+            localState.striker.vx = vxG;
+            localState.striker.vy = vyG;
+            localState.simulating = true;
+            localState.shotCooldown = true;
+            localState.pocketedThisTurn = [];
+        }
+
+        function setupCoins() {
+            localState.coins = [];
+            let coinId = 0;
+            const r = COIN_RADIUS; // 15
+            const spacing = r * 2 + 1.0; // 31.0px center-to-center
+
+            // 1. Queen at exact center
+            localState.coins.push({
+                id: coinId++,
+                type: 'queen',
+                x: 400,
+                y: 400,
+                vx: 0,
+                vy: 0,
+                active: true,
+                angle: Math.random() * Math.PI,
+                w: 0,
+                scale: 1.0,
+                opacity: 1.0,
+                pocketing: false
+            });
+
+            // 2. Inner Hexagon (6 coins at radius 31.0px)
+            const ring1Types = ['white', 'black', 'white', 'black', 'white', 'black'];
+            for (let i = 0; i < 6; i++) {
+                const angle = (i * Math.PI) / 3;
+                localState.coins.push({
+                    id: coinId++,
+                    type: ring1Types[i],
+                    x: 400 + Math.cos(angle) * spacing,
+                    y: 400 + Math.sin(angle) * spacing,
+                    vx: 0,
+                    vy: 0,
+                    active: true,
+                    angle: Math.random() * Math.PI,
+                    w: 0,
+                    scale: 1.0,
+                    opacity: 1.0,
+                    pocketing: false
+                });
+            }
+
+            // 3. Outer Hexagon (12 coins in tight mathematical alignment)
+            // 6 Corner coins at radius 2 * spacing = 62.0px
+            // 6 Edge coins at radius spacing * sqrt(3) = 53.69px
+            const ring2Types = ['black', 'white', 'black', 'white', 'black', 'white', 'black', 'white', 'black', 'white', 'black', 'white'];
+            for (let i = 0; i < 12; i++) {
+                const angle = (i * Math.PI) / 6;
+                const dist = (i % 2 === 0) ? (spacing * 2) : (spacing * Math.sqrt(3));
+                localState.coins.push({
+                    id: coinId++,
+                    type: ring2Types[i],
+                    x: 400 + Math.cos(angle) * dist,
+                    y: 400 + Math.sin(angle) * dist,
+                    vx: 0,
+                    vy: 0,
+                    active: true,
+                    angle: Math.random() * Math.PI,
+                    w: 0,
+                    scale: 1.0,
+                    opacity: 1.0,
+                    pocketing: false
+                });
+            }
+        }
+
+        function resetStriker() {
+            const turnIdx = localState.currentTurnIndex;
+            const angle = ANGLES[turnIdx];
+            const localX = 0;
+            const localY = 240;
+
+            localState.striker.x = 400 + localX * Math.cos(angle) - localY * Math.sin(angle);
+            localState.striker.y = 400 + localX * Math.sin(angle) + localY * Math.cos(angle);
+            localState.striker.vx = 0;
+            localState.striker.vy = 0;
+            localState.striker.active = true;
+            localState.striker.w = 0;
+            localState.striker.scale = 1.0;
+            localState.striker.opacity = 1.0;
+            localState.striker.pocketing = false;
+
+            slider.value = 0;
+        }
+
+        function resetTurnTimer() {
+            localState.timerRemaining = 30;
+        }
+
+        function respawnCoin(type) {
+            const c = localState.coins.find(coin => coin.type === type && !coin.active);
+            if (c) {
+                c.active = true;
+                c.scale = 1.0;
+                c.opacity = 1.0;
+                c.pocketing = false;
+                
+                let attempts = 0;
+                let foundSpot = false;
+                while (attempts < 20 && !foundSpot) {
+                    const radiusOffset = attempts * 6;
+                    const randAngle = Math.random() * Math.PI * 2;
+                    c.x = 400 + Math.cos(randAngle) * radiusOffset;
+                    c.y = 400 + Math.sin(randAngle) * radiusOffset;
+                    
+                    let overlaps = false;
+                    localState.coins.forEach(other => {
+                        if (other.id !== c.id && other.active) {
+                            if (Math.hypot(other.x - c.x, other.y - c.y) < COIN_RADIUS * 2) {
+                                overlaps = true;
+                            }
+                        }
+                    });
+                    if (!overlaps) foundSpot = true;
+                    attempts++;
+                }
+                c.vx = 0;
+                c.vy = 0;
+                spawnParticles(c.x, c.y, '#eab308', 8);
+            }
+        }
+
+        function checkWinCondition() {
+            if (localState.preset === 'points') {
+                const activeCoins = localState.coins.filter(c => c.active);
+                if (activeCoins.length === 0) {
+                    let max = -1;
+                    let topPlayer = null;
+                    localState.players.forEach(p => {
+                        if (localState.scores[p.id] > max) {
+                            max = localState.scores[p.id];
+                            topPlayer = p;
+                        }
+                    });
+                    localState.winner = topPlayer;
+                    return true;
+                }
+            } else {
+                const myCoinType = (localState.currentTurnIndex % 2 === 0) ? 'white' : 'black';
+                const remaining = localState.coins.filter(c => c.type === myCoinType && c.active).length;
+                if (remaining === 0 && (localState.queenStatus === 'covered' || !localState.queenRequired)) {
+                    localState.winner = localState.players[localState.currentTurnIndex];
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function advanceTurn() {
+            localState.currentTurnIndex = (localState.currentTurnIndex + 1) % localState.players.length;
+            resetStriker();
+            resetTurnTimer();
+        }
+
+        function handleTimeout() {
+            playFoulSound();
+            advanceTurn();
+            updateUI();
+        }
+
+        // --- AUTHORITATIVE PHYSICS STEPPING ---
+        let accumulator = 0;
+        const TIME_STEP = 1 / 60; 
+
+        function runPhysicsStep(dt) {
+            accumulator += dt;
+            while (accumulator >= TIME_STEP) {
+                stepSimulation(TIME_STEP);
+                accumulator -= TIME_STEP;
+                if (!localState.simulating) {
+                    accumulator = 0;
+                    break;
+                }
+            }
+        }
+
+        function stepSimulation(simDt) {
+            const subSteps = 12; // 12-substep swept collision fidelity solver
+            const subDt = simDt / subSteps;
+
+            for (let step = 0; step < subSteps; step++) {
+                updatePositions(subDt);
+                resolveCollisions();
+                checkWallBoundaries();
+                resolvePocketing();
+            }
+
+            // Check if all elements came to a rest state
+            let allRest = true;
+            const restEpsilon = 0.5;
+
+            if (localState.striker.active && !localState.striker.pocketing) {
+                if (Math.hypot(localState.striker.vx, localState.striker.vy) > restEpsilon) {
+                    allRest = false;
+                }
+            }
+            localState.coins.forEach(c => {
+                if (c.active && !c.pocketing) {
+                    if (Math.hypot(c.vx, c.vy) > restEpsilon) allRest = false;
+                }
+            });
+
+            if (allRest) {
+                // Jacobi settling loop: runs 15 position-only iterations to ensure zero overlap at rest
+                for (let iter = 0; iter < 15; iter++) {
+                    resolveCollisionsOnlyPositions();
+                }
+
+                localState.simulating = false;
+                localState.striker.vx = 0;
+                localState.striker.vy = 0;
+                localState.coins.forEach(c => { c.vx = 0; c.vy = 0; });
+                resolveTurnOutcome();
+            }
+        }
+
+        function resolveCollisionsOnlyPositions() {
+            const items = [];
+            if (localState.striker.active && !localState.striker.pocketing) {
+                items.push({ item: localState.striker, radius: STRIKER_RADIUS, mass: STRIKER_MASS, dx: 0, dy: 0, count: 0 });
+            }
+            localState.coins.forEach(c => {
+                if (c.active && !c.pocketing) {
+                    items.push({ item: c, radius: COIN_RADIUS, mass: COIN_MASS, dx: 0, dy: 0, count: 0 });
+                }
+            });
+
+            for (let i = 0; i < items.length; i++) {
+                for (let j = i + 1; j < items.length; j++) {
+                    const a = items[i];
+                    const b = items[j];
+
+                    const dx = b.item.x - a.item.x;
+                    const dy = b.item.y - a.item.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = a.radius + b.radius;
+
+                    if (dist < minDist) {
+                        const nx = dx / (dist || 1);
+                        const ny = dy / (dist || 1);
+
+                        const overlap = minDist - dist;
+                        if (overlap > 0) {
+                            const totalMass = a.mass + b.mass;
+                            const percent = 0.5;
+                            const slop = 0.005;
+                            const correctionAmount = Math.max(0, overlap - slop) * percent;
+                            const cx = nx * correctionAmount;
+                            const cy = ny * correctionAmount;
+
+                            a.dx -= cx * (b.mass / totalMass);
+                            a.dy -= cy * (b.mass / totalMass);
+                            a.count++;
+
+                            b.dx += cx * (a.mass / totalMass);
+                            b.dy += cy * (a.mass / totalMass);
+                            b.count++;
+                        }
+                    }
+                }
+            }
+
+            items.forEach(a => {
+                if (a.count > 0) {
+                    a.item.x += a.dx / a.count;
+                    a.item.y += a.dy / a.count;
+                }
+            });
+
+            const minCoord = FRAME_BORDER;
+            const maxCoord = BOARD_SIZE - FRAME_BORDER;
+            items.forEach(a => {
+                const radius = a.radius;
+                if (a.item.x < minCoord + radius) a.item.x = minCoord + radius;
+                if (a.item.x > maxCoord - radius) a.item.x = maxCoord - radius;
+                if (a.item.y < minCoord + radius) a.item.y = minCoord + radius;
+                if (a.item.y > maxCoord - radius) a.item.y = maxCoord - radius;
+            });
+        }
+
+        function updatePositions(dt) {
+            const baseFriction = localState.boardFriction * 50; 
+
+            const applyDamping = (item) => {
+                if (!item.active || item.pocketing) return;
+                const speed = Math.hypot(item.vx, item.vy);
+                if (speed > 0) {
+                    // Constant friction deceleration + velocity-dependent quadratic drag friction
+                    const drag = 0.55 * baseFriction; 
+                    const constFriction = 55 * baseFriction; 
+                    
+                    let decel = constFriction + drag * speed;
+                    const newSpeed = Math.max(0, speed - decel * dt);
+                    
+                    item.vx = (item.vx / speed) * newSpeed;
+                    item.vy = (item.vy / speed) * newSpeed;
+                }
+                
+                item.x += item.vx * dt;
+                item.y += item.vy * dt;
+
+                // Visual spin rotation damping
+                item.angle += item.w * dt;
+                item.w *= Math.max(0, 1 - 1.8 * dt);
+            };
+
+            applyDamping(localState.striker);
+            localState.coins.forEach(applyDamping);
+        }
+
+        function resolveCollisions() {
+            const items = [];
+            if (localState.striker.active && !localState.striker.pocketing) {
+                items.push({ item: localState.striker, radius: STRIKER_RADIUS, mass: STRIKER_MASS, dx: 0, dy: 0, count: 0 });
+            }
+            localState.coins.forEach(c => {
+                if (c.active && !c.pocketing) {
+                    items.push({ item: c, radius: COIN_RADIUS, mass: COIN_MASS, dx: 0, dy: 0, count: 0 });
+                }
+            });
+
+            for (let i = 0; i < items.length; i++) {
+                for (let j = i + 1; j < items.length; j++) {
+                    const a = items[i];
+                    const b = items[j];
+
+                    const dx = b.item.x - a.item.x;
+                    const dy = b.item.y - a.item.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = a.radius + b.radius;
+
+                    if (dist < minDist) {
+                        const nx = dx / (dist || 1);
+                        const ny = dy / (dist || 1);
+
+                        // Jacobi soft overlap accumulator
+                        const overlap = minDist - dist;
+                        if (overlap > 0) {
+                            const totalMass = a.mass + b.mass;
+                            const percent = 0.35; 
+                            const slop = 0.01;
+                            const correctionAmount = Math.max(0, overlap - slop) * percent;
+                            const cx = nx * correctionAmount;
+                            const cy = ny * correctionAmount;
+
+                            a.dx -= cx * (b.mass / totalMass);
+                            a.dy -= cy * (b.mass / totalMass);
+                            a.count++;
+
+                            b.dx += cx * (a.mass / totalMass);
+                            b.dy += cy * (a.mass / totalMass);
+                            b.count++;
+                        }
+
+                        const rvx = b.item.vx - a.item.vx;
+                        const rvy = b.item.vy - a.item.vy;
+                        const velAlongNormal = rvx * nx + rvy * ny;
+
+                        if (velAlongNormal < 0) {
+                            const e = 0.85; 
+                            const impulse = -(1 + e) * velAlongNormal / (1 / a.mass + 1 / b.mass);
+
+                            a.item.vx -= (impulse / a.mass) * nx;
+                            a.item.vy -= (impulse / a.mass) * ny;
+                            b.item.vx += (impulse / b.mass) * nx;
+                            b.item.vy += (impulse / b.mass) * ny;
+
+                            // Rotational tangent friction transfer
+                            const tx = -ny;
+                            const ty = nx;
+                            const velAlongTangent = rvx * tx + rvy * ty;
+                            const tangentImpulse = velAlongTangent * 0.2;
+
+                            a.item.w += tangentImpulse / a.mass;
+                            b.item.w -= tangentImpulse / b.mass;
+
+                            const strikeIntensity = Math.abs(velAlongNormal);
+                            if (strikeIntensity > 15) {
+                                playHitSound(Math.min(1.0, strikeIntensity / 100), 400 + Math.random() * 80);
+                                spawnParticles(a.item.x + nx * a.radius, a.item.y + ny * a.radius, '#fafae8', 3);
+                            }
+                        }
+                    }
+                }
+            }
+
+            items.forEach(a => {
+                if (a.count > 0) {
+                    a.item.x += a.dx / a.count;
+                    a.item.y += a.dy / a.count;
+                }
+            });
+        }
+
+        function checkWallBoundaries() {
+            const e = 0.82; 
+            const minCoord = FRAME_BORDER;
+            const maxCoord = BOARD_SIZE - FRAME_BORDER;
+
+            const handleBounce = (item, radius) => {
+                if (!item.active || item.pocketing) return;
+                
+                let hitWall = false;
+                let wallVx = item.vx;
+                let wallVy = item.vy;
+
+                if (item.x < minCoord + radius) {
+                    item.x = minCoord + radius;
+                    item.vx = -item.vx * e;
+                    hitWall = true;
+                    wallVx = item.vx;
+                }
+                if (item.x > maxCoord - radius) {
+                    item.x = maxCoord - radius;
+                    item.vx = -item.vx * e;
+                    hitWall = true;
+                    wallVx = item.vx;
+                }
+                if (item.y < minCoord + radius) {
+                    item.y = minCoord + radius;
+                    item.vy = -item.vy * e;
+                    hitWall = true;
+                    wallVy = item.vy;
+                }
+                if (item.y > maxCoord - radius) {
+                    item.y = maxCoord - radius;
+                    item.vy = -item.vy * e;
+                    hitWall = true;
+                    wallVy = item.vy;
+                }
+
+                if (hitWall) {
+                    item.w += (item.vx - wallVx) * 0.08; 
+                    const speed = Math.hypot(item.vx, item.vy);
+                    if (speed > 18) {
+                        playThudSound(Math.min(0.6, speed / 110));
+                        spawnParticles(item.x, item.y, '#5d4037', 2);
+                    }
+                }
+            };
+
+            handleBounce(localState.striker, STRIKER_RADIUS);
+            localState.coins.forEach(c => handleBounce(c, COIN_RADIUS));
+        }
+
+        function resolvePocketing() {
+            const checkPocket = (item, radius) => {
+                if (!item.active || item.pocketing) return;
+                
+                for (let i = 0; i < POCKETS.length; i++) {
+                    const p = POCKETS[i];
+                    const dist = Math.hypot(item.x - p.x, item.y - p.y);
+                    if (dist < POCKET_RADIUS) {
+                        item.pocketing = true;
+                        item.scale = 1.0;
+                        item.opacity = 1.0;
+                        item.vx = 0;
+                        item.vy = 0;
+                        item.w = 0;
+                    }
+                }
+            };
+
+            checkPocket(localState.striker, STRIKER_RADIUS);
+            localState.coins.forEach(c => checkPocket(c, COIN_RADIUS));
+
+            const animateFall = (item, typeStr) => {
+                if (item.pocketing && item.active) {
+                    let closestPocket = POCKETS[0];
+                    let minDist = Infinity;
+                    POCKETS.forEach(p => {
+                        const d = Math.hypot(item.x - p.x, item.y - p.y);
+                        if (d < minDist) {
+                            minDist = d;
+                            closestPocket = p;
+                        }
+                    });
+
+                    // Attraction to center of pocket
+                    const dx = item.x - closestPocket.x;
+                    const dy = item.y - closestPocket.y;
+                    const dist = Math.hypot(dx, dy) || 1;
+
+                    item.x += (closestPocket.x - item.x) * 0.15;
+                    item.y += (closestPocket.y - item.y) * 0.15;
+                    
+                    // Squash tilt towards pocket center
+                    item.tiltAngle = Math.atan2(dy, dx);
+                    item.tiltAmount = Math.max(0.4, dist / POCKET_RADIUS);
+
+                    // Shrink and fade
+                    item.scale -= 0.12;
+                    item.opacity -= 0.12;
+
+                    if (item.scale <= 0) {
+                        item.active = false;
+                        item.pocketing = false;
+                        localState.pocketedThisTurn.push(typeStr);
+                        playPocketSound();
+                        spawnParticles(closestPocket.x, closestPocket.y, '#d4af37', 10);
+                    }
+                }
+            };
+
+            animateFall(localState.striker, 'striker');
+            localState.coins.forEach(c => animateFall(c, c.type));
+        }
+
+        function resolveTurnOutcome() {
+            const activePlayer = localState.players[localState.currentTurnIndex];
+            const pId = activePlayer.id;
+            
+            let switchTurn = true;
+            const hasStrikerFoul = localState.pocketedThisTurn.includes('striker');
+            const whiteSunk = localState.pocketedThisTurn.filter(t => t === 'white').length;
+            const blackSunk = localState.pocketedThisTurn.filter(t => t === 'black').length;
+            const queenSunk = localState.pocketedThisTurn.includes('queen');
+
+            if (localState.preset === 'points') {
+                let pts = 0;
+                pts += whiteSunk * 2;
+                pts += blackSunk * 1;
+                if (queenSunk) pts += 3;
+
+                if (hasStrikerFoul) {
+                    pts -= 1;
+                    localState.scores[pId] = Math.max(0, localState.scores[pId] + pts);
+                    switchTurn = true;
+                    playFoulSound();
+                } else if (whiteSunk > 0 || blackSunk > 0 || queenSunk) {
+                    localState.scores[pId] += pts;
+                    switchTurn = false;
+                }
+            } else {
+                const myCoinType = (localState.currentTurnIndex % 2 === 0) ? 'white' : 'black';
+                const oppCoinType = (myCoinType === 'white') ? 'black' : 'white';
+
+                const myCoinsSunk = localState.pocketedThisTurn.filter(t => t === myCoinType).length;
+                const oppCoinsSunk = localState.pocketedThisTurn.filter(t => t === oppCoinType).length;
+
+                if (hasStrikerFoul) {
+                    if (localState.scores[pId] > 0) {
+                        localState.scores[pId]--;
+                        respawnCoin(myCoinType);
+                    }
+                    switchTurn = true;
+                    playFoulSound();
+                } else {
+                    if (localState.queenStatus === 'pocketed_pending_cover') {
+                        if (myCoinsSunk > 0) {
+                            localState.queenStatus = 'covered';
+                            localState.scores[localState.queenPocketedBy] += 3;
+                            localState.scores[pId] += myCoinsSunk;
+                            switchTurn = false;
+                        } else {
+                            localState.queenStatus = 'board';
+                            respawnCoin('queen');
+                            localState.queenPocketedBy = null;
+                            switchTurn = true;
+                        }
+                    } else if (queenSunk) {
+                        if (localState.queenRequired) {
+                            localState.queenStatus = 'pocketed_pending_cover';
+                            localState.queenPocketedBy = pId;
+                            switchTurn = false;
+                        } else {
+                            localState.scores[pId] += 3;
+                            switchTurn = false;
+                        }
+                    } else if (myCoinsSunk > 0) {
+                        localState.scores[pId] += myCoinsSunk;
+                        switchTurn = false;
+                    } else if (oppCoinsSunk > 0) {
+                        localState.players.forEach((p, idx) => {
+                            const pCoinType = (idx % 2 === 0) ? 'white' : 'black';
+                            if (pCoinType === oppCoinType) {
+                                localState.scores[p.id] += oppCoinsSunk;
+                            }
+                        });
+                        switchTurn = true;
+                    }
+                }
+            }
+
+            if (checkWinCondition()) {
+                localState.status = STATE.FINISHED;
+                playWinSound();
+                updateUI();
+                return;
+            }
+
+            localState.shotCooldown = false;
+            if (switchTurn) {
+                advanceTurn();
+            } else {
+                resetStriker();
+                resetTurnTimer();
+            }
+            updateUI();
+        }
+
+        // --- DRAWING CANVAS DECALS (STATIC LAYER) ---
+        function drawStaticBoard() {
+            const ctx = staticCtx;
+            ctx.clearRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+
+            // 1. Ivory board surface background (Radial gradient simulating spotlighting)
+            let bgGrad = ctx.createRadialGradient(400, 400, 50, 400, 400, 600);
+            bgGrad.addColorStop(0, '#fbf8eb');
+            bgGrad.addColorStop(0.6, '#ebdcb8');
+            bgGrad.addColorStop(1, '#d8c499');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+
+            // Concentric faint maple varnished wood grain rings
+            ctx.strokeStyle = 'rgba(40, 20, 10, 0.015)';
+            ctx.lineWidth = 1.0;
+            for (let i = 1; i <= 36; i++) {
+                ctx.beginPath();
+                ctx.arc(400 + i * 3.5, 400 + i * 2.2, 80 + i * 18, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // 2. Walnut Wood frame borders (Procedural planks with wood grains)
+            const drawPlank = (x, y, w, h, isVertical) => {
+                ctx.save();
+                let woodGrad = ctx.createLinearGradient(x, y, x + (isVertical ? w : 0), y + (isVertical ? 0 : h));
+                woodGrad.addColorStop(0, '#1c0c04');
+                woodGrad.addColorStop(0.5, '#3c1d0a');
+                woodGrad.addColorStop(1, '#130702');
+                ctx.fillStyle = woodGrad;
+                ctx.fillRect(x, y, w, h);
+
+                // Organic wood grain fine lines
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                const lines = isVertical ? w : h;
+                for (let i = 0; i < lines; i += 4) {
+                    ctx.globalAlpha = 0.03 + 0.07 * Math.random();
+                    if (isVertical) {
+                        ctx.fillRect(x + i, y, 1.5 + Math.random() * 2, h);
+                    } else {
+                        ctx.fillRect(x, y + i, w, 1.5 + Math.random() * 2);
+                    }
+                }
+                
+                // organic waves/knots
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+                ctx.lineWidth = 3.5;
+                ctx.globalAlpha = 0.05;
+                ctx.beginPath();
+                if (isVertical) {
+                    let wx = x + w * 0.5;
+                    ctx.moveTo(wx, y);
+                    ctx.bezierCurveTo(wx - 15, y + h*0.3, wx + 15, y + h*0.7, wx - 5, y + h);
+                } else {
+                    let wy = y + h * 0.5;
+                    ctx.moveTo(x, wy);
+                    ctx.bezierCurveTo(x + w*0.3, wy - 15, x + w*0.7, wy + 15, x + w, wy - 5);
+                }
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            // Draw Planks
+            drawPlank(0, 0, BOARD_SIZE, FRAME_BORDER, false); // Top
+            drawPlank(0, BOARD_SIZE - FRAME_BORDER, BOARD_SIZE, FRAME_BORDER, false); // Bottom
+            drawPlank(0, FRAME_BORDER, FRAME_BORDER, BOARD_SIZE - FRAME_BORDER * 2, true); // Left
+            drawPlank(BOARD_SIZE - FRAME_BORDER, FRAME_BORDER, FRAME_BORDER, BOARD_SIZE - FRAME_BORDER * 2, true); // Right
+
+            // Miter joints corners cuts
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            ctx.moveTo(0,0); ctx.lineTo(FRAME_BORDER, FRAME_BORDER);
+            ctx.moveTo(BOARD_SIZE, 0); ctx.lineTo(BOARD_SIZE - FRAME_BORDER, FRAME_BORDER);
+            ctx.moveTo(0, BOARD_SIZE); ctx.lineTo(FRAME_BORDER, BOARD_SIZE - FRAME_BORDER);
+            ctx.moveTo(BOARD_SIZE, BOARD_SIZE); ctx.lineTo(BOARD_SIZE - FRAME_BORDER, BOARD_SIZE - FRAME_BORDER);
+            ctx.stroke();
+
+            // Inner gold frame bevel border lines
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 2.0;
+            ctx.strokeRect(FRAME_BORDER, FRAME_BORDER, BOARD_SIZE - FRAME_BORDER * 2, BOARD_SIZE - FRAME_BORDER * 2);
+
+            // Inner wood frame dark bevel shadow casting onto the ivory board
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+            ctx.shadowBlur = 15;
+            ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(FRAME_BORDER + 2.5, FRAME_BORDER + 2.5, BOARD_SIZE - FRAME_BORDER * 2 - 5, BOARD_SIZE - FRAME_BORDER * 2 - 5);
+            ctx.restore();
+
+            // Brass corner bracket plates
+            const drawCornerBracket = (cx, cy, rotateAngle) => {
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(rotateAngle);
+                
+                let brassGrad = ctx.createLinearGradient(-15, -15, 15, 15);
+                brassGrad.addColorStop(0, '#ffe58a');
+                brassGrad.addColorStop(0.5, '#d4af37');
+                brassGrad.addColorStop(1, '#8a6f27');
+                ctx.fillStyle = brassGrad;
+                
+                ctx.beginPath();
+                ctx.moveTo(-25, -25);
+                ctx.lineTo(25, -25);
+                ctx.lineTo(25, -12);
+                ctx.lineTo(-12, -12);
+                ctx.lineTo(-12, 25);
+                ctx.lineTo(-25, 25);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.strokeStyle = '#5c450c';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+                
+                // Tiny screw rivets
+                ctx.fillStyle = '#3c2b03';
+                ctx.beginPath(); ctx.arc(15, -18, 2.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(-18, 15, 2.5, 0, Math.PI*2); ctx.fill();
+                
+                ctx.restore();
+            };
+            
+            drawCornerBracket(20, 20, 0);
+            drawCornerBracket(BOARD_SIZE - 20, 20, Math.PI / 2);
+            drawCornerBracket(BOARD_SIZE - 20, BOARD_SIZE - 20, Math.PI);
+            drawCornerBracket(20, BOARD_SIZE - 20, -Math.PI / 2);
+
+            // 3. Central Mandala (Clean Tournament Star Mandala)
+            ctx.save();
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath(); ctx.arc(400, 400, 75, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#ab1213';
+            ctx.lineWidth = 3.0;
+            ctx.beginPath(); ctx.arc(400, 400, 68, 0, Math.PI * 2); ctx.stroke();
+
+            // 12-point star design
+            ctx.fillStyle = '#ab1213';
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 1.2;
+            const points = 12;
+            ctx.beginPath();
+            for (let i = 0; i < points * 2; i++) {
+                const angle = (i * Math.PI) / points;
+                const r = (i % 2 === 0) ? 60 : 32;
+                const mx = 400 + Math.cos(angle) * r;
+                const my = 400 + Math.sin(angle) * r;
+                if (i === 0) ctx.moveTo(mx, my);
+                else ctx.lineTo(mx, my);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Center gold medallion
+            ctx.fillStyle = '#faf6e8';
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath(); ctx.arc(400, 400, 28, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            // Red center core
+            ctx.fillStyle = '#ab1213';
+            ctx.beginPath(); ctx.arc(400, 400, 12, 0, Math.PI * 2); ctx.fill();
+            
+            // Gold dot
+            ctx.fillStyle = '#d4af37';
+            ctx.beginPath(); ctx.arc(400, 400, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+
+            // 4. Baseline rails (Symmetrical baseline tracks for all 4 sides)
+            const drawRail = (angle) => {
+                ctx.save();
+                ctx.translate(400, 400);
+                ctx.rotate(angle);
+                ctx.translate(-400, -400);
+                
+                // Red baseline parallel rails (run from x=200 to x=600 at y=630 and y=650)
+                ctx.strokeStyle = '#ab1213';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(200, 650);
+                ctx.lineTo(600, 650);
+                ctx.moveTo(200, 630);
+                ctx.lineTo(600, 630);
+                ctx.stroke();
+
+                // Tournament Base Circles at both ends (radius 21 matching striker radius)
+                const drawBaseCircle = (cx, cy) => {
+                    ctx.fillStyle = '#ab1213';
+                    ctx.strokeStyle = '#d4af37';
+                    ctx.lineWidth = 2.0;
+                    ctx.beginPath(); ctx.arc(cx, cy, 21, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    
+                    ctx.fillStyle = '#faf6e8';
+                    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+                };
+                
+                drawBaseCircle(200, 640);
+                drawBaseCircle(600, 640);
+
+                ctx.restore();
+            };
+            ANGLES.forEach(drawRail);
+
+            // 5. Diagonal corner guidelines and pocket arrow guides
+            const drawCornerGuides = (angle) => {
+                ctx.save();
+                ctx.translate(400, 400);
+                ctx.rotate(angle);
+                ctx.translate(-400, -400);
+                
+                // Diagonal guidelines from outer center mandala (r=75) towards corner pockets
+                ctx.strokeStyle = '#110601';
+                ctx.lineWidth = 1.8;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.moveTo(400 - Math.cos(Math.PI/4)*80, 400 - Math.sin(Math.PI/4)*80);
+                ctx.lineTo(95, 95);
+                ctx.stroke();
+
+                // Circular arrow arcs near pocket intersections
+                ctx.beginPath();
+                ctx.arc(175, 175, 26, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Pocket guide arrows pointing directly into corner pockets
+                ctx.fillStyle = '#ab1213';
+                ctx.strokeStyle = '#d4af37';
+                ctx.lineWidth = 1.2;
+                ctx.globalAlpha = 1.0;
+                ctx.beginPath();
+                ctx.moveTo(82, 82);
+                ctx.lineTo(100, 92);
+                ctx.lineTo(92, 100);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.restore();
+            };
+            ANGLES.forEach(drawCornerGuides);
+
+            // 6. Recessed pockets with brass rims and mesh nets
+            POCKETS.forEach(p => {
+                ctx.save();
+                // Dark bottom recess
+                let pocketGrad = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, POCKET_RADIUS);
+                pocketGrad.addColorStop(0, '#000000');
+                pocketGrad.addColorStop(0.8, '#120803');
+                pocketGrad.addColorStop(1, '#2d160a');
+                ctx.fillStyle = pocketGrad;
+                ctx.beginPath(); ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2); ctx.fill();
+
+                // Pocket net representation
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.lineWidth = 1.0;
+                ctx.beginPath();
+                for (let offset = -POCKET_RADIUS + 8; offset < POCKET_RADIUS; offset += 8) {
+                    ctx.moveTo(p.x + offset, p.y - Math.sqrt(POCKET_RADIUS*POCKET_RADIUS - offset*offset));
+                    ctx.lineTo(p.x + offset, p.y + Math.sqrt(POCKET_RADIUS*POCKET_RADIUS - offset*offset));
+                    ctx.moveTo(p.x - Math.sqrt(POCKET_RADIUS*POCKET_RADIUS - offset*offset), p.y + offset);
+                    ctx.lineTo(p.x + Math.sqrt(POCKET_RADIUS*POCKET_RADIUS - offset*offset), p.y + offset);
+                }
+                ctx.stroke();
+
+                // Shiny gold brass metallic rim ring
+                let rimGrad = ctx.createRadialGradient(p.x, p.y, POCKET_RADIUS - 3, p.x, p.y, POCKET_RADIUS + 2);
+                rimGrad.addColorStop(0, '#8a6f27');
+                rimGrad.addColorStop(0.3, '#ffd700');
+                rimGrad.addColorStop(0.7, '#d4af37');
+                rimGrad.addColorStop(1, '#5c450c');
+                ctx.strokeStyle = rimGrad;
+                ctx.lineWidth = 4.0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
+            });
+        }
+
+        // --- DYNAMIC LAYER RENDER METHODS ---
+        function draw3DCoin(c) {
+            if (!c.active) return;
+            const x = c.x;
+            const y = c.y;
+            const r = COIN_RADIUS * c.scale;
+            
+            // Dynamic light shadow offset (light source top-left at (250, 200))
+            const dx = x - 250;
+            const dy = y - 200;
+            const dist = Math.hypot(dx, dy) || 1;
+            
+            let shadowOpacity = 0.5 * c.opacity;
+            let offsetMult = 1.0;
+            if (c.pocketing) {
+                offsetMult = c.scale; 
+            }
+            const sx = (dx / dist) * 4.5 * offsetMult;
+            const sy = (dy / dist) * 5.5 * offsetMult;
+            
+            dynamicCtx.save();
+            
+            // Dynamic tilt deformation on pocket fall
+            if (c.pocketing && c.tiltAngle !== undefined) {
+                dynamicCtx.translate(x, y);
+                dynamicCtx.rotate(c.tiltAngle);
+                dynamicCtx.scale(c.tiltAmount, 1.0);
+                dynamicCtx.translate(-x, -y);
+            }
+
+            // Coin 3D bevel thickness shadow
+            dynamicCtx.shadowColor = `rgba(0,0,0,${shadowOpacity})`;
+            dynamicCtx.shadowBlur = (4.0 + (1.0 - c.scale) * 6.0) * c.scale;
+            dynamicCtx.shadowOffsetX = sx;
+            dynamicCtx.shadowOffsetY = sy;
+            
+            // Draw coin thickness base shadow
+            dynamicCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x + sx * 0.2, y + sy * 0.2, r, 0, Math.PI * 2);
+            dynamicCtx.fill();
+            
+            dynamicCtx.shadowColor = 'transparent'; 
+            
+            // Bevel radial gradients
+            let gradient = dynamicCtx.createRadialGradient(
+                x - r * 0.35, y - r * 0.35, r * 0.08,
+                x, y, r
+            );
+            
+            let outlineColor = '#000000';
+            let ridgeColor = 'rgba(255, 255, 255, 0.12)';
+            
+            if (c.type === 'queen') {
+                gradient.addColorStop(0, '#ffa5a5');
+                gradient.addColorStop(0.3, '#ab1213');
+                gradient.addColorStop(0.85, '#6b0708');
+                gradient.addColorStop(1.0, '#360203');
+                outlineColor = '#470203';
+                ridgeColor = 'rgba(255, 215, 0, 0.3)';
+            } else if (c.type === 'white') {
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.4, '#fdfde4');
+                gradient.addColorStop(0.85, '#dbdab3');
+                gradient.addColorStop(1.0, '#a1a07d');
+                outlineColor = '#7a795f';
+                ridgeColor = 'rgba(255, 255, 255, 0.35)';
+            } else {
+                gradient.addColorStop(0, '#594d43');
+                gradient.addColorStop(0.45, '#2b1b10');
+                gradient.addColorStop(0.85, '#120a05');
+                gradient.addColorStop(1.0, '#000000');
+                outlineColor = '#000000';
+                ridgeColor = 'rgba(255, 255, 255, 0.08)';
+            }
+            
+            dynamicCtx.fillStyle = gradient;
+            dynamicCtx.strokeStyle = outlineColor;
+            dynamicCtx.lineWidth = 1.0 * c.scale;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r, 0, Math.PI * 2);
+            dynamicCtx.fill();
+            dynamicCtx.stroke();
+
+            // Concentric wooden rings (lathe grooves)
+            dynamicCtx.strokeStyle = ridgeColor;
+            dynamicCtx.lineWidth = 0.8 * c.scale;
+            dynamicCtx.beginPath(); dynamicCtx.arc(x, y, r * 0.74, 0, Math.PI * 2); dynamicCtx.stroke();
+            dynamicCtx.beginPath(); dynamicCtx.arc(x, y, r * 0.44, 0, Math.PI * 2); dynamicCtx.stroke();
+
+            // Visual rotation grain markings
+            dynamicCtx.save();
+            dynamicCtx.translate(x, y);
+            dynamicCtx.rotate(c.angle);
+            
+            // Wooden texture lines (fine arcs inside the coin)
+            dynamicCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+            dynamicCtx.lineWidth = 0.8 * c.scale;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(0, 0, r * 0.6, -Math.PI / 4, Math.PI / 4);
+            dynamicCtx.stroke();
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(0, 0, r * 0.6, Math.PI * 0.75, Math.PI * 1.25);
+            dynamicCtx.stroke();
+
+            // Visual spin grain dots
+            dynamicCtx.fillStyle = outlineColor;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(r * 0.58, 0, 1.2 * c.scale, 0, Math.PI * 2);
+            dynamicCtx.arc(-r * 0.58, 0, 1.2 * c.scale, 0, Math.PI * 2);
+            dynamicCtx.fill();
+            dynamicCtx.restore();
+            
+            // Center ring/core
+            if (c.type === 'queen') {
+                dynamicCtx.fillStyle = '#d4af37';
+            } else {
+                dynamicCtx.fillStyle = outlineColor;
+            }
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r * 0.18, 0, Math.PI * 2);
+            dynamicCtx.fill();
+
+            // Specular reflection dot on top-left of the coin
+            dynamicCtx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x - r * 0.3, y - r * 0.3, r * 0.15, 0, Math.PI * 2);
+            dynamicCtx.fill();
+            
+            dynamicCtx.restore();
+        }
+
+        function drawStriker(s) {
+            if (!s.active) return;
+            const x = s.x;
+            const y = s.y;
+            const r = STRIKER_RADIUS * s.scale;
+            
+            // Light vector offsets
+            const dx = x - 250;
+            const dy = y - 200;
+            const dist = Math.hypot(dx, dy) || 1;
+            
+            const forceLen = Math.hypot(dragForce.x, dragForce.y);
+            const maxForce = 170;
+            const tension = forceLen / maxForce;
+
+            // Elastic tension: shadow offsets and softens/stretches during drag
+            let offsetMult = 1.0;
+            if (s.pocketing) offsetMult = s.scale;
+            const sx = (dx / dist) * (6.5 + tension * 12.0) * offsetMult;
+            const sy = (dy / dist) * (7.5 + tension * 15.0) * offsetMult;
+            const shadowBlur = (12.0 + tension * 15.0) * s.scale;
+
+            dynamicCtx.save();
+
+            // Dynamic tilt on pocket drop
+            if (s.pocketing && s.tiltAngle !== undefined) {
+                dynamicCtx.translate(x, y);
+                dynamicCtx.rotate(s.tiltAngle);
+                dynamicCtx.scale(s.tiltAmount, 1.0);
+                dynamicCtx.translate(-x, -y);
+            }
+
+            // Striker shadow (representing height/thickness)
+            dynamicCtx.shadowColor = `rgba(0, 0, 0, ${0.55 * s.opacity})`;
+            dynamicCtx.shadowBlur = shadowBlur;
+            dynamicCtx.shadowOffsetX = sx;
+            dynamicCtx.shadowOffsetY = sy;
+
+            dynamicCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r, 0, Math.PI * 2);
+            dynamicCtx.fill();
+
+            // Reset shadow to draw the striker itself
+            dynamicCtx.shadowColor = 'transparent';
+
+            // Active player breathing select halo
+            if (localState.status === STATE.PLAYING && !localState.simulating && !s.pocketing) {
+                const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.007);
+                dynamicCtx.strokeStyle = `rgba(14, 165, 233, ${0.45 + 0.45 * pulse})`;
+                dynamicCtx.lineWidth = 2.0 + 2 * pulse;
+                dynamicCtx.beginPath();
+                dynamicCtx.arc(x, y, r + 2.0, 0, Math.PI * 2);
+                dynamicCtx.stroke();
+            }
+
+            // Elastic Squash-and-Stretch scale compression mapping along aiming angle
+            if (isAiming && forceLen > 10 && !s.pocketing) {
+                const squashAngle = Math.atan2(dragForce.y, dragForce.x);
+                dynamicCtx.translate(x, y);
+                dynamicCtx.rotate(squashAngle);
+                
+                const scaleX = 1.0 - 0.12 * tension;
+                const scaleY = 1.0 + 0.06 * tension;
+                dynamicCtx.scale(scaleX, scaleY);
+                
+                dynamicCtx.translate(-x, -y);
+            }
+
+            // 1. Drawing the base Marble puck with rotational spin
+            dynamicCtx.save();
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r, 0, Math.PI * 2);
+            dynamicCtx.clip();
+
+            // Marble base color: glossy white/ivory
+            let marbleBase = dynamicCtx.createRadialGradient(
+                x - r * 0.35, y - r * 0.35, r * 0.1,
+                x, y, r
+            );
+            marbleBase.addColorStop(0, '#ffffff');
+            marbleBase.addColorStop(0.7, '#fdfaf0');
+            marbleBase.addColorStop(1, '#dbd5c5');
+            dynamicCtx.fillStyle = marbleBase;
+            dynamicCtx.fill();
+
+            // Swirling marble veins (rotates with the striker angle)
+            dynamicCtx.translate(x, y);
+            dynamicCtx.rotate(s.angle);
+            dynamicCtx.translate(-x, -y);
+
+            dynamicCtx.strokeStyle = 'rgba(212, 175, 55, 0.22)'; // gold veins
+            dynamicCtx.lineWidth = 2.5 * s.scale;
+            dynamicCtx.beginPath();
+            dynamicCtx.moveTo(x - r, y - r * 0.2);
+            dynamicCtx.bezierCurveTo(x - r*0.3, y - r * 0.8, x + r*0.3, y + r*0.5, x + r, y + r * 0.2);
+            dynamicCtx.stroke();
+
+            dynamicCtx.strokeStyle = 'rgba(120, 110, 95, 0.15)'; // grey veins
+            dynamicCtx.lineWidth = 1.5 * s.scale;
+            dynamicCtx.beginPath();
+            dynamicCtx.moveTo(x - r*0.5, y + r);
+            dynamicCtx.bezierCurveTo(x - r*0.2, y, x + r*0.6, y - r*0.2, x + r*0.8, y - r);
+            dynamicCtx.stroke();
+
+            dynamicCtx.restore();
+
+            // 2. Shiny outer gold metallic rim
+            let rimGrad = dynamicCtx.createRadialGradient(
+                x - r * 0.35, y - r * 0.35, r * 0.8,
+                x, y, r
+            );
+            rimGrad.addColorStop(0, '#ffe58a');
+            rimGrad.addColorStop(0.5, '#d4af37');
+            rimGrad.addColorStop(1, '#8a6f27');
+            
+            dynamicCtx.strokeStyle = rimGrad;
+            dynamicCtx.lineWidth = 3.5 * s.scale;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r - 1.75 * s.scale, 0, Math.PI * 2);
+            dynamicCtx.stroke();
+
+            // Outer dark outline
+            dynamicCtx.strokeStyle = '#1a0f02';
+            dynamicCtx.lineWidth = 1.0;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r, 0, Math.PI * 2);
+            dynamicCtx.stroke();
+
+            // 3. Concentric inner grooves
+            dynamicCtx.strokeStyle = 'rgba(138, 111, 39, 0.55)';
+            dynamicCtx.lineWidth = 0.8 * s.scale;
+            dynamicCtx.beginPath(); dynamicCtx.arc(x, y, r * 0.74, 0, Math.PI * 2); dynamicCtx.stroke();
+            dynamicCtx.beginPath(); dynamicCtx.arc(x, y, r * 0.50, 0, Math.PI * 2); dynamicCtx.stroke();
+
+            // 4. Center gemstone inlay (Glossy ruby gem)
+            let gemGrad = dynamicCtx.createRadialGradient(x, y, 0, x, y, r * 0.28);
+            gemGrad.addColorStop(0, '#ff9e9e');
+            gemGrad.addColorStop(0.4, '#ab1213');
+            gemGrad.addColorStop(0.85, '#6b0708');
+            gemGrad.addColorStop(1.0, '#360203');
+            
+            dynamicCtx.fillStyle = gemGrad;
+            dynamicCtx.strokeStyle = '#d4af37';
+            dynamicCtx.lineWidth = 1.6 * s.scale;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x, y, r * 0.28, 0, Math.PI * 2);
+            dynamicCtx.fill();
+            dynamicCtx.stroke();
+
+            // 5. Intense specular light reflection crescent on top-left
+            let specGrad = dynamicCtx.createRadialGradient(
+                x - r * 0.45, y - r * 0.45, 0,
+                x - r * 0.45, y - r * 0.45, r * 0.4
+            );
+            specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
+            specGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            dynamicCtx.fillStyle = specGrad;
+            dynamicCtx.beginPath();
+            dynamicCtx.arc(x - r*0.45, y - r*0.45, r*0.4, 0, Math.PI * 2);
+            dynamicCtx.fill();
+
+            dynamicCtx.restore();
+        }
+
+        // --- TRAJECTORY PATH DRAWING ---
+        function drawAimPrediction() {
+            if (!isAiming) return;
+
+            const forceLen = Math.hypot(dragForce.x, dragForce.y);
+            if (forceLen < 15) return;
+
+            const turnIdx = localState.currentTurnIndex;
+            const globalForce = localForceToGlobal(dragForce.x, dragForce.y, turnIdx);
+
+            const startX = localState.striker.x;
+            const startY = localState.striker.y;
+
+            const aimVx = globalForce.x * 5;
+            const aimVy = globalForce.y * 5;
+
+            let firstCollision = null;
+            let closestDist = Infinity;
+            let collidedCoin = null;
+
+            localState.coins.forEach(c => {
+                if (!c.active) return;
+                const intersect = getLineCircleIntersection(
+                    startX, startY,
+                    aimVx, aimVy,
+                    c.x, c.y,
+                    STRIKER_RADIUS + COIN_RADIUS
+                );
+                if (intersect && intersect.dist < closestDist) {
+                    closestDist = intersect.dist;
+                    firstCollision = intersect;
+                    collidedCoin = c;
+                }
+            });
+
+            dynamicCtx.save();
+            dynamicCtx.strokeStyle = 'rgba(212, 175, 55, 0.65)';
+            dynamicCtx.lineWidth = 2.5;
+            dynamicCtx.setLineDash([5, 5]);
+
+            if (firstCollision) {
+                dynamicCtx.beginPath();
+                dynamicCtx.moveTo(startX, startY);
+                dynamicCtx.lineTo(firstCollision.x, firstCollision.y);
+                dynamicCtx.stroke();
+
+                // Ghost striker outline
+                dynamicCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                dynamicCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+                dynamicCtx.lineWidth = 1.0;
+                dynamicCtx.setLineDash([]);
+                dynamicCtx.beginPath();
+                dynamicCtx.arc(firstCollision.x, firstCollision.y, STRIKER_RADIUS, 0, Math.PI * 2);
+                dynamicCtx.fill();
+                dynamicCtx.stroke();
+
+                const pushDx = collidedCoin.x - firstCollision.x;
+                const pushDy = collidedCoin.y - firstCollision.y;
+                const pushDist = Math.hypot(pushDx, pushDy);
+
+                if (pushDist > 0) {
+                    const nx = pushDx / pushDist;
+                    const ny = pushDy / pushDist;
+                    const endX = collidedCoin.x + nx * 75;
+                    const endY = collidedCoin.y + ny * 75;
+
+                    dynamicCtx.strokeStyle = '#22c55e';
+                    dynamicCtx.lineWidth = 2.2;
+                    dynamicCtx.beginPath();
+                    dynamicCtx.moveTo(collidedCoin.x, collidedCoin.y);
+                    dynamicCtx.lineTo(endX, endY);
+                    dynamicCtx.stroke();
+
+                    dynamicCtx.fillStyle = '#22c55e';
+                    dynamicCtx.beginPath();
+                    dynamicCtx.moveTo(endX, endY);
+                    dynamicCtx.lineTo(endX - nx * 7 + ny * 4.5, endY - ny * 7 - nx * 4.5);
+                    dynamicCtx.lineTo(endX - nx * 7 - ny * 4.5, endY - ny * 7 + nx * 4.5);
+                    dynamicCtx.closePath();
+                    dynamicCtx.fill();
+                }
+            } else {
+                const len = 340;
+                const angle = Math.atan2(aimVy, aimVx);
+                dynamicCtx.beginPath();
+                dynamicCtx.moveTo(startX, startY);
+                dynamicCtx.lineTo(startX + Math.cos(angle) * len, startY + Math.sin(angle) * len);
+                dynamicCtx.stroke();
+            }
+            dynamicCtx.restore();
+        }
+
+        function drawParticles() {
+            dynamicCtx.save();
+            localState.particles.forEach(p => {
+                dynamicCtx.fillStyle = p.color;
+                dynamicCtx.globalAlpha = p.alpha;
+                dynamicCtx.beginPath();
+                dynamicCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                dynamicCtx.fill();
+            });
+            dynamicCtx.restore();
+        }
+
+        function renderCanvas() {
+            dynamicCtx.save();
+            dynamicCtx.clearRect(0, 0, 800, 800);
+
+            if (localState.status === STATE.MENU) {
+                dynamicCtx.restore();
+                return;
+            }
+
+            // Draw Aiming predictions
+            drawAimPrediction();
+
+            // Draw Striker
+            drawStriker(localState.striker);
+
+            // Draw Coins
+            localState.coins.forEach(draw3DCoin);
+
+            // Draw Particles
+            drawParticles();
+
+            // Aim tension overlay
+            if (isAiming) {
+                 const turnIdx = localState.currentTurnIndex;
+                 const strikerG = localState.striker;
+                 const touchG = localToGlobal(aimCurrent.x, aimCurrent.y, turnIdx);
+  
+                 dynamicCtx.save();
+                 
+                 const maxForce = 170;
+                 const forceLen = Math.hypot(dragForce.x, dragForce.y);
+                 const isMaxed = (forceLen >= maxForce - 5);
+                 
+                 let fieldGrad = dynamicCtx.createRadialGradient(
+                     strikerG.x, strikerG.y, 0,
+                     strikerG.x, strikerG.y, maxForce
+                 );
+                 if (isMaxed) {
+                     fieldGrad.addColorStop(0, 'rgba(239, 68, 68, 0.0)');
+                     fieldGrad.addColorStop(0.8, 'rgba(239, 68, 68, 0.04)');
+                     fieldGrad.addColorStop(1.0, 'rgba(239, 68, 68, 0.12)');
+                     dynamicCtx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                 } else {
+                     fieldGrad.addColorStop(0, 'rgba(14, 165, 233, 0.0)');
+                     fieldGrad.addColorStop(0.8, 'rgba(14, 165, 233, 0.03)');
+                     fieldGrad.addColorStop(1.0, `rgba(14, 165, 233, ${0.04 + 0.08 * (forceLen / maxForce)})`);
+                     dynamicCtx.strokeStyle = 'rgba(14, 165, 233, 0.3)';
+                 }
+                 
+                 dynamicCtx.fillStyle = fieldGrad;
+                 dynamicCtx.beginPath();
+                 dynamicCtx.arc(strikerG.x, strikerG.y, maxForce, 0, Math.PI * 2);
+                 dynamicCtx.fill();
+                 
+                 dynamicCtx.lineWidth = 1.2;
+                 dynamicCtx.setLineDash([4, 4]);
+                 dynamicCtx.stroke();
+                 dynamicCtx.restore();
+  
+                 dynamicCtx.save();
+                 dynamicCtx.shadowColor = isMaxed ? '#ef4444' : '#0ea5e9';
+                 dynamicCtx.shadowBlur = 6;
+                 dynamicCtx.strokeStyle = isMaxed ? '#ef4444' : '#0ea5e9';
+                 dynamicCtx.lineWidth = 3.0;
+                 dynamicCtx.beginPath();
+                 dynamicCtx.moveTo(strikerG.x, strikerG.y);
+                 dynamicCtx.lineTo(touchG.x, touchG.y);
+                 dynamicCtx.stroke();
+  
+                 dynamicCtx.shadowColor = 'transparent';
+                 dynamicCtx.fillStyle = '#ffffff';
+                 dynamicCtx.strokeStyle = isMaxed ? '#ef4444' : '#d4af37';
+                 dynamicCtx.lineWidth = 2.0;
+                 dynamicCtx.beginPath();
+                 dynamicCtx.arc(touchG.x, touchG.y, 7.5, 0, Math.PI * 2);
+                 dynamicCtx.fill();
+                 dynamicCtx.stroke();
+                 dynamicCtx.restore();
+            }
+
+            dynamicCtx.restore();
+        }
+
+        // --- DATA BINDINGS & UPDATE LOOPS ---
+        function updateTimerUI() {
+            const timerVal = Math.ceil(localState.timerRemaining) || 0;
+            const timerText = document.getElementById('timer-text');
+            const timerBar = document.getElementById('timer-bar');
+            
+            timerText.innerText = timerVal > 0 ? `${timerVal}s` : "";
+            timerBar.style.width = localState.simulating ? '0%' : `${(localState.timerRemaining / 30) * 100}%`;
+            timerBar.style.backgroundColor = localState.timerRemaining < 10 ? 'var(--tournament-red)' : '#22c55e';
+        }
+
+        function updateUI() {
+            const activePlayer = localState.players[localState.currentTurnIndex];
+            const activeColor = activePlayer.color;
+
+            const activeHeader = document.getElementById('active-player-name');
+            activeHeader.innerText = `${activePlayer.name.toUpperCase()}'S SHOT`;
+            
+            if (activeColor === 'red') activeHeader.style.color = 'var(--tournament-red)';
+            else if (activeColor === 'green') activeHeader.style.color = '#22c55e';
+            else if (activeColor === 'yellow') activeHeader.style.color = '#eab308';
+            else if (activeColor === 'blue') activeHeader.style.color = '#3b82f6';
+
+            updateTimerUI();
+
+            const localStriker = globalToLocal(localState.striker.x, localState.striker.y, localState.currentTurnIndex);
+            slider.value = localStriker.x;
+            slider.disabled = localState.simulating || localState.shotCooldown;
+
+            for (let idx = 0; idx < 4; idx++) {
+                const card = document.getElementById(`hud-card-${idx}`);
+                if (card) card.style.display = 'none';
+            }
+
+            localState.players.forEach((p, idx) => {
+                const card = document.getElementById(`hud-card-${idx}`);
+                if (card) {
+                    card.style.display = 'flex';
+                    if (idx === localState.currentTurnIndex) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+
+                    const nameElem = card.querySelector('.hud-name');
+                    const scoreElem = card.querySelector('.hud-score');
+                    const imgElem = card.querySelector('.hud-avatar');
+
+                    nameElem.innerText = p.name;
+                    scoreElem.innerText = `${localState.scores[p.id] || 0} pts`;
+                    imgElem.src = fallbackAvatars[idx];
+                }
+            });
+
+            if (localState.status === STATE.FINISHED) {
+                document.getElementById('turn-banner').style.display = 'none';
+                document.getElementById('controls-container').style.display = 'none';
+
+                const winTitle = document.getElementById('win-title');
+                const winDesc = document.getElementById('win-description');
+                
+                winTitle.innerText = "MATCH COMPLETED";
+                winDesc.innerText = `${localState.winner.name.toUpperCase()} has won the match with ${localState.scores[localState.winner.id]} points!`;
+                
+                document.getElementById('win-overlay').style.display = 'block';
+            }
+        }
+
+        // --- RESPONSIVE LAYOUT RESIZER (Integer Pixel Snapping) ---
+        function resizeGame() {
+            const wrapper = document.getElementById('board-wrapper');
+            if (!wrapper) return;
+            
+            const wWidth = window.innerWidth;
+            const wHeight = window.innerHeight;
+            
+            // Available height for board: Total window minus banner, scores, controls
+            const reserved = wWidth < 600 ? 120 : 160;
+            const pad = wWidth < 600 ? 8 : 16;
+            
+            const maxW = wWidth - pad * 2;
+            const maxH = wHeight - reserved - pad * 2;
+            
+            let size = Math.min(maxW, maxH);
+            
+            // Portrait phone optimization: use up to 90% width
+            if (wWidth < wHeight) {
+                size = Math.min(wWidth * 0.90, maxH);
+            } else {
+                size = Math.min(maxH, maxW);
+            }
+            
+            // Snap to even integer to clear subpixel canvas blur
+            size = Math.floor(size / 2) * 2;
+            if (size < 280) size = 280; 
+
+            wrapper.style.width = size + 'px';
+            wrapper.style.height = size + 'px';
+            
+            // Redraw background once
+            staticCanvas.width = BOARD_SIZE;
+            staticCanvas.height = BOARD_SIZE;
+            dynamicCanvas.width = BOARD_SIZE;
+            dynamicCanvas.height = BOARD_SIZE;
+
+            drawStaticBoard();
+        }
+
+        window.addEventListener('resize', resizeGame);
+
+        // --- MATCH CONTROLLER ---
+        function onPlayerCountChange() {
+            const container = document.getElementById('name-inputs-container');
+            const count = parseInt(document.getElementById('players-select').value);
+            container.innerHTML = '';
+ 
+            const colors = ['Red', 'Green', 'Yellow', 'Blue'];
+            const borderColors = ['border-red-500', 'border-green-500', 'border-yellow-500', 'border-blue-500'];
+ 
+            for (let i = 0; i < count; i++) {
+                container.innerHTML += `
+                    <div class="player-name-field">
+                        <label class="player-name-label">Player ${i+1} (${colors[i]}):</label>
+                        <input type="text" id="name-input-${i}" placeholder="Enter name..." value="Player ${i+1}"
+                            class="player-name-input ${borderColors[i]}">
+                    </div>
+                `;
+            }
+        }
+
+        function startMatch() {
+            getAudioContext();
+            const modeSelect = document.getElementById('mode-select');
+            const playersSelect = document.getElementById('players-select');
+            
+            localState.preset = modeSelect.value;
+            localState.numPlayers = parseInt(playersSelect.value);
+            localState.boardFriction = parseFloat(document.getElementById('friction-select').value);
+            localState.queenRequired = (localState.preset === 'classic');
+
+            localState.players = [];
+            const colors = ['red', 'green', 'yellow', 'blue'];
+            for (let i = 0; i < localState.numPlayers; i++) {
+                const nameInput = document.getElementById(`name-input-${i}`);
+                let name = nameInput ? nameInput.value.trim() : '';
+                if (!name) name = `Player ${i+1}`;
+                localState.players.push({
+                    id: `player_${i}`,
+                    name: name,
+                    color: colors[i]
+                });
+                localState.scores[`player_${i}`] = 0;
+            }
+
+            localState.currentTurnIndex = 0;
+            localState.status = STATE.PLAYING;
+            localState.simulating = false;
+            localState.shotCooldown = false;
+            localState.queenStatus = 'board';
+            localState.queenPocketedBy = null;
+            localState.winner = null;
+            localState.particles = [];
+
+            setupCoins();
+            resetStriker();
+            resetTurnTimer();
+
+            document.getElementById('main-menu').style.display = 'none';
+            document.getElementById('turn-banner').style.display = 'flex';
+            document.getElementById('board-wrapper').style.display = 'block';
+            document.getElementById('controls-container').style.display = 'flex';
+
+            resizeGame();
+            updateUI();
+        }
+
+        function restartMatch() {
+            getAudioContext();
+            document.getElementById('win-overlay').style.display = 'none';
+            document.getElementById('main-menu').style.display = 'block';
+            document.getElementById('turn-banner').style.display = 'none';
+            document.getElementById('board-wrapper').style.display = 'none';
+            document.getElementById('controls-container').style.display = 'none';
+            onPlayerCountChange();
+        }
+
+        onPlayerCountChange();
+
+        // Game Loop
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            requestAnimationFrame(gameLoop);
+
+            if (!lastTime) lastTime = timestamp;
+            let dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (dt > 0.03) dt = 0.03;
+
+            if (localState.status === STATE.PLAYING) {
+                if (localState.simulating) {
+                    runPhysicsStep(dt);
+                } else {
+                    if (localState.timerRemaining > 0) {
+                        localState.timerRemaining -= dt;
+                        if (localState.timerRemaining <= 0) {
+                            localState.timerRemaining = 0;
+                            handleTimeout();
+                        }
+                        updateTimerUI();
+                    }
+                }
+                updateParticles(dt);
+            }
+
+            renderCanvas();
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+
+</html>

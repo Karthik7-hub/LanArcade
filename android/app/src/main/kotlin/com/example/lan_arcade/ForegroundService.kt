@@ -12,6 +12,13 @@ import android.os.IBinder
 import android.os.PowerManager
 
 class ForegroundService : Service() {
+    companion object {
+        @JvmStatic var isServiceRunning = false
+        @JvmStatic var isWakeLockHeld = false
+        @JvmStatic var isWifiLockHeld = false
+        @JvmStatic var isMulticastLockHeld = false
+    }
+
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var multicastLock: WifiManager.MulticastLock? = null
@@ -65,10 +72,22 @@ class ForegroundService : Service() {
             }
         }
 
+        isServiceRunning = true
+        isWakeLockHeld = wakeLock?.isHeld == true
+        isWifiLockHeld = wifiLock?.isHeld == true
+        isMulticastLockHeld = multicastLock?.isHeld == true
+
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()
@@ -84,7 +103,24 @@ class ForegroundService : Service() {
                 multicastLock?.release()
             }
         } catch (e: Exception) {}
+
+        isServiceRunning = false
+        isWakeLockHeld = false
+        isWifiLockHeld = false
+        isMulticastLockHeld = false
+
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
