@@ -41,11 +41,13 @@
       "values": {
         "classic": {
           "queenRequired": true,
-          "boardFriction": 0.02
+          "boardFriction": 0.02,
+          "turnTimer": 30
         },
         "points": {
           "queenRequired": false,
-          "boardFriction": 0.02
+          "boardFriction": 0.02,
+          "turnTimer": 30
         }
       }
     },
@@ -62,6 +64,17 @@
       "label": "Queen Cover Required",
       "description": "Must sink another piece right after pocketing the Queen",
       "default": true
+    },
+    "turnTimer": {
+      "type": "select",
+      "label": "Turn Duration",
+      "description": "Seconds allowed per turn",
+      "default": 30,
+      "options": [
+        {"value": 15, "label": "15 Seconds"},
+        {"value": 30, "label": "30 Seconds"},
+        {"value": 45, "label": "45 Seconds"}
+      ]
     }
   }
 }

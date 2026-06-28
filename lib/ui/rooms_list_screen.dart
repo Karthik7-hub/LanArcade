@@ -304,20 +304,19 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    room.game.name.toUpperCase(),
-                                    style: ArcadeFonts.plusJakartaSans(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900,
-                                      color: ArcadeTheme.textPrimary,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                Text(
+                                  room.game.name.toUpperCase(),
+                                  style: ArcadeFonts.plusJakartaSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: ArcadeTheme.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -338,25 +337,32 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
                               children: [
-                                Text(
-                                  'ROOM CODE: ',
-                                  style: ArcadeFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: ArcadeTheme.textSecondary,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'ROOM CODE: ',
+                                      style: ArcadeFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: ArcadeTheme.textSecondary,
+                                      ),
+                                    ),
+                                    Text(
+                                      room.code,
+                                      style: ArcadeFonts.firaCode(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: ArcadeTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  room.code,
-                                  style: ArcadeFonts.firaCode(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    color: ArcadeTheme.primaryColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
                                 InkWell(
                                   onTap: () {
                                     final joinUrl = 'http://${widget.ipAddress}:${KernelManager.serverPort}/?room=${room.code}';
@@ -378,7 +384,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                                   },
                                   borderRadius: BorderRadius.circular(6),
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [

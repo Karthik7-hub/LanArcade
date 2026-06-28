@@ -68,11 +68,13 @@ const engine = {
         this.state.queenPocketedBy = null;
 
         const colors = ['red', 'green', 'yellow', 'blue'];
+        this.state.stats = {};
         players.forEach((p, idx) => {
             const color = colors[idx];
             this.state.playerColors[p.id] = color;
             this.state.turnOrder.push(color);
             this.state.scores[p.id] = 0;
+            this.state.stats[p.id] = { pocketed: 0, fouls: 0 };
         });
 
         this.state.currentTurnIndex = 0;
@@ -101,13 +103,13 @@ const engine = {
             active: true
         });
 
-        // 2. Inner Hexagon (6 coins)
-        const ring1Types = ['white', 'black', 'white', 'black', 'white', 'black'];
+        // 2. Inner Ring of 6 coins (alternating white and black)
         for (let i = 0; i < 6; i++) {
             const angle = (i * Math.PI) / 3;
+            const type = (i % 2 === 0) ? 'white' : 'black';
             this.state.coins.push({
                 id: coinId++,
-                type: ring1Types[i],
+                type: type,
                 x: 400 + Math.cos(angle) * spacing,
                 y: 400 + Math.sin(angle) * spacing,
                 vx: 0,
@@ -116,14 +118,23 @@ const engine = {
             });
         }
 
-        // 3. Outer Hexagon (12 coins)
-        const ring2Types = ['black', 'white', 'black', 'white', 'black', 'white', 'black', 'white', 'black', 'white', 'black', 'white'];
+        // 3. Outer Ring of 12 coins
+        const r2 = spacing * Math.sqrt(3);
+        const r2Corner = spacing * 2.0;
+
         for (let i = 0; i < 12; i++) {
-            const angle = (i * Math.PI) / 6;
-            const dist = (i % 2 === 0) ? (spacing * 2) : (spacing * Math.sqrt(3));
+            let angle, dist;
+            if (i % 2 === 0) {
+                angle = (i * Math.PI) / 6;
+                dist = r2Corner;
+            } else {
+                angle = (i * Math.PI) / 6;
+                dist = r2;
+            }
+            const type = (i % 2 === 0) ? 'black' : 'white';
             this.state.coins.push({
                 id: coinId++,
-                type: ring2Types[i],
+                type: type,
                 x: 400 + Math.cos(angle) * dist,
                 y: 400 + Math.sin(angle) * dist,
                 vx: 0,
@@ -137,7 +148,7 @@ const engine = {
         const turnIdx = this.state.currentTurnIndex;
         const angle = this.ANGLES[turnIdx];
         const localX = 0;
-        const localY = 240; // 640 - 400
+        const localY = 240;
 
         this.state.striker.x = 400 + localX * Math.cos(angle) - localY * Math.sin(angle);
         this.state.striker.y = 400 + localX * Math.sin(angle) + localY * Math.cos(angle);
@@ -147,7 +158,7 @@ const engine = {
     },
 
     resetTurnTimer: function() {
-        this.state.timerRemaining = 30; // 30 seconds turn timer
+        this.state.timerRemaining = this.state.settings.turnTimer || 30;
     },
 
     getCurrentPlayerId: function() {
@@ -156,6 +167,14 @@ const engine = {
     },
 
     onAction: function(player, action) {
+        if (action.type === 'update_settings') {
+            if (action.data && action.data.settings) {
+                this.state.settings = { ...this.state.settings, ...action.data.settings };
+                this.sync();
+            }
+            return;
+        }
+
         if (this.state.status !== 'active') return;
 
         const activePlayerId = this.getCurrentPlayerId();
@@ -293,8 +312,8 @@ const engine = {
             if (!item.active) return;
             const speed = Math.hypot(item.vx, item.vy);
             if (speed > 0) {
-                const drag = 0.55 * baseFriction;
-                const constFriction = 55 * baseFriction;
+                const drag = 0.25 * baseFriction;
+                const constFriction = 28 * baseFriction;
                 let decel = constFriction + drag * speed;
                 const newSpeed = Math.max(0, speed - decel * dt);
                 item.vx = (item.vx / speed) * newSpeed;

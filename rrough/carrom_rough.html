@@ -1392,8 +1392,8 @@
                 const speed = Math.hypot(item.vx, item.vy);
                 if (speed > 0) {
                     // Constant friction deceleration + velocity-dependent quadratic drag friction
-                    const drag = 0.55 * baseFriction; 
-                    const constFriction = 55 * baseFriction; 
+                    const drag = 0.25 * baseFriction; 
+                    const constFriction = 28 * baseFriction; 
                     
                     let decel = constFriction + drag * speed;
                     const newSpeed = Math.max(0, speed - decel * dt);

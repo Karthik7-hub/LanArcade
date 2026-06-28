@@ -19,15 +19,6 @@ class PlayerHandler extends MessageHandler {
     final String playerId = payload['id'] ?? '';
     final String sessionToken = payload['sessionToken'] ?? '';
 
-    // Reject if this player ID is already active on another connection.
-    if (playerId.isNotEmpty &&
-        ctx.connectionManager
-            .isPlayerOnlineGlobally(playerId, connectionId)) {
-      connection.send('system.error',
-          'This Player ID is already active on another device.');
-      return;
-    }
-
     String? name = payload['name'];
     String avatar = payload['avatar'] ?? 'default';
 
@@ -72,6 +63,8 @@ class PlayerHandler extends MessageHandler {
         resolvedSessionToken =
             sessionToken.isNotEmpty ? sessionToken : ctx.uuid.v4();
       }
+      // Clean up any stale/closing connection from previous page refreshes
+      ctx.connectionManager.removeStaleConnections(resolvedPlayerId, connectionId);
     } else {
       resolvedPlayerId = ctx.uuid.v4();
       resolvedSessionToken = ctx.uuid.v4();

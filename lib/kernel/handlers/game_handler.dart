@@ -2,6 +2,7 @@ import 'message_handler.dart';
 import '../../database/database.dart';
 import 'package:drift/drift.dart';
 import '../../shared/models.dart' as models;
+import '../game_engine_factory.dart';
 
 /// Handles `game.action` — START, UNLOCK_ACHIEVEMENT, and generic game actions.
 class GameActionHandler extends MessageHandler {
@@ -12,8 +13,7 @@ class GameActionHandler extends MessageHandler {
     if (connection == null) return;
     if (connection.roomId == null || connection.player == null) return;
 
-    final engine = ctx.activeEngines[connection.roomId];
-    if (engine == null) return;
+    var engine = ctx.activeEngines[connection.roomId];
 
     if (payload['type'] == 'START') {
       final roomId = connection.roomId!;
@@ -23,6 +23,16 @@ class GameActionHandler extends MessageHandler {
           connection.send(
               'system.error', 'Not enough players to start the game.');
           return;
+        }
+        if (engine == null) {
+          final code = await ctx.pluginManager.getEngineCode(room.game.id);
+          engine = GameEngineFactory.createEngine(
+            manifest: room.game,
+            roomId: roomId,
+            ctx: ctx,
+          );
+          await engine.load(code);
+          ctx.activeEngines[roomId] = engine;
         }
         final updatedRoom =
             room.copyWith(status: models.RoomStatus.active);
@@ -37,6 +47,8 @@ class GameActionHandler extends MessageHandler {
         ctx.connectionManager
             .broadcastToRoom(roomId, 'room.update', finalRoom.toJson());
       }
+    } else if (engine == null) {
+      return;
     } else if (payload['type'] == 'UNLOCK_ACHIEVEMENT') {
       final aid = payload['data']['achievementId'] as String;
       try {

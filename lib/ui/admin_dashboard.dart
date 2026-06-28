@@ -581,12 +581,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 children: [
                   const Icon(Icons.link, size: 16, color: ArcadeTheme.primaryColor),
                   const SizedBox(width: 8),
-                  Text(
-                    serverUrl,
-                    style: ArcadeFonts.firaCode(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: ArcadeTheme.textPrimary,
+                  Flexible(
+                    child: Text(
+                      serverUrl,
+                      overflow: TextOverflow.ellipsis,
+                      style: ArcadeFonts.firaCode(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: ArcadeTheme.textPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),

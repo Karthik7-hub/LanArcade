@@ -76,20 +76,24 @@
             justify-content: center;
             position: relative;
             box-sizing: border-box;
-            padding: 10px;
-            gap: 10px;
+            padding: 12px 10px;
+            gap: 8px;
         }
 
         @media (min-width: 600px) {
             #game-container {
-                padding: 20px;
-                gap: 16px;
+                padding: 16px;
+                gap: 12px;
             }
         }
 
         /* --- STABLE FIXED BOARD WRAPPER --- */
         #board-wrapper {
             position: relative;
+            width: min(88vw, 60vh, 500px);
+            height: min(88vw, 60vh, 500px);
+            max-width: 500px;
+            max-height: 500px;
             box-shadow: 
                 0 20px 50px rgba(0, 0, 0, 0.95),
                 inset 0 0 10px rgba(255, 255, 255, 0.15);
@@ -99,6 +103,7 @@
             border-radius: 24px;
             display: block;
             border: 4px solid #110601;
+            flex-shrink: 0;
         }
 
         #static-canvas,
@@ -141,6 +146,7 @@
             gap: 4px;
             z-index: 50;
             box-sizing: border-box;
+            flex-shrink: 0;
         }
 
         .turn-content {
@@ -152,7 +158,7 @@
         .turn-label {
             font-family: 'Montserrat', sans-serif;
             font-weight: 900;
-            font-size: 13px;
+            font-size: 14px;
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
@@ -160,7 +166,7 @@
         .timer-value {
             font-family: 'Montserrat', sans-serif;
             font-weight: 900;
-            font-size: 13px;
+            font-size: 14px;
             color: #ef4444;
         }
 
@@ -189,6 +195,7 @@
             gap: 12px;
             z-index: 50;
             box-sizing: border-box;
+            flex-shrink: 0;
         }
 
         .hud-card {
@@ -204,7 +211,7 @@
             z-index: 40;
             flex: 1;
             max-width: 160px;
-            height: 38px;
+            height: 36px;
             box-sizing: border-box;
             transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
@@ -288,10 +295,12 @@
             max-width: 440px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 4px;
             align-items: center;
             z-index: 50;
             box-sizing: border-box;
+            flex-shrink: 0;
+            margin-top: 2px;
         }
 
         .striker-slider-container {
@@ -301,7 +310,7 @@
             gap: 12px;
             background: linear-gradient(180deg, #2d160a 0%, #150a04 100%);
             border: 1.5px solid var(--gold-accent);
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 20px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
             box-sizing: border-box;
@@ -353,23 +362,126 @@
             text-align: center;
         }
 
-        /* Floating Chat Button */
-        .chat-btn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2d160a 0%, #150a04 100%);
-            border: 1.5px solid var(--gold-accent);
+        /* --- END MATCH STANDINGS MODAL --- */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(7, 3, 1, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .modal-box {
+            width: 100%;
+            max-width: 400px;
+            background: linear-gradient(145deg, #2d160a 0%, #150a04 100%);
+            border: 2px solid var(--gold-accent);
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-sizing: border-box;
+            color: var(--surface-ivory);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1.5px solid var(--outline-color);
+            padding-bottom: 12px;
+        }
+
+        .modal-title {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 16px;
             color: var(--gold-accent);
+            letter-spacing: 0.05em;
             display: flex;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            gap: 8px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--surface-dim);
+            font-size: 18px;
             cursor: pointer;
-            z-index: 60;
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Leaderboard table */
+        .lb-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(212, 175, 55, 0.15);
+            border-radius: 12px;
+            padding: 8px 12px;
+        }
+
+        .lb-row.rank-1 {
+            border-color: var(--gold-accent);
+            background: linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, rgba(0,0,0,0.4) 100%);
+        }
+
+        .lb-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rank-badge {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .lb-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .lb-score {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 14px;
+            color: var(--gold-accent);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #d4af37 0%, #8a6f27 100%);
+            color: #110601;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.02);
         }
     </style>
 </head>
@@ -455,10 +567,19 @@
         </div>
     </div>
 
-    <!-- Floating Chat Toggle Button -->
-    <button class="chat-btn" data-purpose="chat-toggle">
-        <svg fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path></svg>
-    </button>
+    <!-- END MATCH STANDINGS MODAL -->
+    <div id="leaderboard-modal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">🏆 Match Standings</div>
+                <button class="modal-close" onclick="toggleLeaderboardModal()">✖</button>
+            </div>
+            <div class="modal-body" id="leaderboard-list">
+                <!-- Dynamically populated rows -->
+            </div>
+            <button class="btn-primary" onclick="toggleLeaderboardModal()">Continue</button>
+        </div>
+    </div>
 
     <!-- Audio Service Bridge & Synthesizer -->
     <script>
@@ -673,6 +794,35 @@
             "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><circle cx='50' cy='35' r='20' fill='%23faf6e8'/><path d='M15 85c0-18 15-25 35-25s35 7 35 25z' fill='%23faf6e8'/></svg>"
         ];
 
+        function resizeGame() {
+            const wrapper = document.getElementById('board-wrapper');
+            if (!wrapper) return;
+            
+            const wWidth = window.innerWidth;
+            const wHeight = window.innerHeight;
+            
+            const reserved = wWidth < 600 ? 140 : 180;
+            const pad = wWidth < 600 ? 12 : 24;
+            
+            const maxW = wWidth - pad * 2;
+            const maxH = wHeight - reserved - pad * 2;
+            
+            let size = Math.min(maxW, maxH);
+            size = Math.floor(size / 2) * 2;
+            if (size < 260) size = 260; 
+
+            wrapper.style.width = size + 'px';
+            wrapper.style.height = size + 'px';
+        }
+
+        window.addEventListener('resize', resizeGame);
+
+        function toggleLeaderboardModal() {
+            const modal = document.getElementById('leaderboard-modal');
+            const isVisible = modal.style.display === 'flex';
+            modal.style.display = isVisible ? 'none' : 'flex';
+        }
+
         function getPlayerAvatar(playerId, idx) {
             const room = Arcade.getRoom();
             if (room && room.players) {
@@ -697,6 +847,7 @@
         let activeTurnIndex = 0;
         let myTurnIndex = -1;
         let clientParticles = [];
+        let winnerModalShown = false;
 
         // Interaction state
         let isAiming = false;
@@ -1153,22 +1304,12 @@
             });
         }
 
-        // --- DYNAMIC LAYER RENDER METHODS ---
+        // --- HIGH PERFORMANCE DYNAMIC RENDER (NO SHADOW BLUR OVERHEAD) ---
         function draw3DCoin(c) {
             if (!c.active) return;
             const x = c.x;
             const y = c.y;
             const r = COIN_RADIUS * (c.scale || 1.0);
-            
-            const dx = x - 250;
-            const dy = y - 200;
-            const dist = Math.hypot(dx, dy) || 1;
-            
-            let shadowOpacity = 0.5 * (c.opacity || 1.0);
-            let offsetMult = 1.0;
-            if (c.pocketing) offsetMult = c.scale || 1.0;
-            const sx = (dx / dist) * 4.5 * offsetMult;
-            const sy = (dy / dist) * 5.5 * offsetMult;
             
             dynamicCtx.save();
             
@@ -1179,17 +1320,11 @@
                 dynamicCtx.translate(-x, -y);
             }
 
-            dynamicCtx.shadowColor = `rgba(0,0,0,${shadowOpacity})`;
-            dynamicCtx.shadowBlur = (4.0 + (1.0 - (c.scale || 1.0)) * 6.0) * (c.scale || 1.0);
-            dynamicCtx.shadowOffsetX = sx;
-            dynamicCtx.shadowOffsetY = sy;
-            
-            dynamicCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            // 100% GPU Hardware accelerated flat offset shadow (0 CPU Blur overhead)
+            dynamicCtx.fillStyle = 'rgba(0, 0, 0, 0.35)';
             dynamicCtx.beginPath();
-            dynamicCtx.arc(x + sx * 0.2, y + sy * 0.2, r, 0, Math.PI * 2);
+            dynamicCtx.arc(x + 3.0 * (c.scale || 1.0), y + 4.0 * (c.scale || 1.0), r, 0, Math.PI * 2);
             dynamicCtx.fill();
-            
-            dynamicCtx.shadowColor = 'transparent'; 
             
             let gradient = dynamicCtx.createRadialGradient(
                 x - r * 0.35, y - r * 0.35, r * 0.08,
@@ -1279,19 +1414,9 @@
             const y = s.y;
             const r = STRIKER_RADIUS * (s.scale || 1.0);
             
-            const dx = x - 250;
-            const dy = y - 200;
-            const dist = Math.hypot(dx, dy) || 1;
-            
             const forceLen = Math.hypot(dragForce.x, dragForce.y);
             const maxForce = 170;
             const tension = forceLen / maxForce;
-
-            let offsetMult = 1.0;
-            if (s.pocketing) offsetMult = s.scale || 1.0;
-            const sx = (dx / dist) * (6.5 + tension * 12.0) * offsetMult;
-            const sy = (dy / dist) * (7.5 + tension * 15.0) * offsetMult;
-            const shadowBlur = (12.0 + tension * 15.0) * (s.scale || 1.0);
 
             dynamicCtx.save();
 
@@ -1302,17 +1427,11 @@
                 dynamicCtx.translate(-x, -y);
             }
 
-            dynamicCtx.shadowColor = `rgba(0, 0, 0, ${0.55 * (s.opacity || 1.0)})`;
-            dynamicCtx.shadowBlur = shadowBlur;
-            dynamicCtx.shadowOffsetX = sx;
-            dynamicCtx.shadowOffsetY = sy;
-
-            dynamicCtx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            // High performance hardware accelerated striker shadow
+            dynamicCtx.fillStyle = 'rgba(0, 0, 0, 0.4)';
             dynamicCtx.beginPath();
-            dynamicCtx.arc(x, y, r, 0, Math.PI * 2);
+            dynamicCtx.arc(x + 4.0 * (s.scale || 1.0), y + 5.0 * (s.scale || 1.0), r, 0, Math.PI * 2);
             dynamicCtx.fill();
-
-            dynamicCtx.shadowColor = 'transparent';
 
             if (pState && pState.status === 'active' && !pState.simulating && !s.pocketing && myTurnIndex === activeTurnIndex) {
                 const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.007);
@@ -1513,6 +1632,7 @@
         }
 
         function drawParticles() {
+            if (clientParticles.length === 0) return;
             dynamicCtx.save();
             clientParticles.forEach(p => {
                 dynamicCtx.fillStyle = p.color;
@@ -1525,7 +1645,6 @@
         }
 
         let lastFrameTime = 0;
-        let lastCollisionsMap = {};
 
         function animate(timestamp) {
             requestAnimationFrame(animate);
@@ -1537,15 +1656,15 @@
             if (dt > 0.03) dt = 0.03;
 
             const pState = Arcade.getPublicState();
-            if (!pState) return;
+            if (!pState || !pState.striker || !Array.isArray(pState.coins)) return;
 
             dynamicCtx.save();
             dynamicCtx.clearRect(0, 0, 800, 800);
 
-            const strikerLerp = (myTurnIndex === activeTurnIndex) ? 0.45 : 0.28;
-            const lerpSpeed = pState.simulating ? 0.38 : 0.45;
+            const strikerLerp = (myTurnIndex === activeTurnIndex) ? 0.85 : 0.65;
+            const lerpSpeed = pState.simulating ? 0.75 : 0.85;
 
-            if (pState.striker.active) {
+            if (pState.striker && pState.striker.active) {
                 clientStriker.x += (pState.striker.x - clientStriker.x) * strikerLerp;
                 clientStriker.y += (pState.striker.y - clientStriker.y) * strikerLerp;
                 clientStriker.active = true;
@@ -1572,22 +1691,6 @@
 
                     if (speed > 0.6) {
                         cc.angle += (dx * Math.sin(cc.angle) - dy * Math.cos(cc.angle)) * 0.08;
-                    }
-
-                    if (speed > 12) {
-                        pState.coins.forEach(other => {
-                            if (other.id !== sc.id && other.active) {
-                                const dist = Math.hypot(sc.x - other.x, sc.y - other.y);
-                                const key = `${Math.min(sc.id, other.id)}_${Math.max(sc.id, other.id)}`;
-                                if (dist < 32 && !lastCollisionsMap[key]) {
-                                    playSound('hit');
-                                    lastCollisionsMap[key] = true;
-                                    setTimeout(() => { delete lastCollisionsMap[key]; }, 150);
-                                    
-                                    spawnParticles((cc.x + other.x)/2, (cc.y + other.y)/2, '#faf6e8', 4);
-                                }
-                            }
-                        });
                     }
 
                     cc.active = true;
@@ -1685,16 +1788,18 @@
         function updateUI() {
             const pState = Arcade.getPublicState();
             const player = Arcade.getPlayer();
-            if (!pState) return;
+            if (!pState || !Array.isArray(pState.turnOrder) || !pState.playerColors || !pState.striker) return;
 
-            activeTurnIndex = pState.currentTurnIndex;
+            activeTurnIndex = pState.currentTurnIndex || 0;
 
-            // Map player identity to perspective index and rotate entire wrapper
-            if (player && myTurnIndex === -1) {
-                const color = pState.playerColors[player.id];
+            // Dynamically map local player identity to perspective index on every update
+            const curPlayer = player || (Arcade.getRoom()?.players?.[0]);
+            if (curPlayer && curPlayer.id && pState.playerColors) {
+                const color = pState.playerColors[curPlayer.id];
                 if (color) {
-                    myTurnIndex = pState.turnOrder.indexOf(color);
-                    if (myTurnIndex !== -1) {
+                    const resolvedIdx = pState.turnOrder.indexOf(color);
+                    if (resolvedIdx !== -1 && resolvedIdx !== myTurnIndex) {
+                        myTurnIndex = resolvedIdx;
                         const angle = ANGLES[myTurnIndex];
                         const rotationDeg = (angle * 180) / Math.PI;
                         const boardWrapper = document.getElementById('board-wrapper');
@@ -1704,7 +1809,7 @@
                 }
             }
 
-            const activeColor = pState.turnOrder[activeTurnIndex];
+            const activeColor = pState.turnOrder[activeTurnIndex] || 'red';
             const isMyTurn = (myTurnIndex === activeTurnIndex);
 
             const activeHeader = document.getElementById('active-player-name');
@@ -1724,13 +1829,14 @@
 
             const localStriker = globalToLocal(pState.striker.x, pState.striker.y, activeTurnIndex);
             slider.value = localStriker.x;
-            slider.disabled = !isMyTurn || pState.simulating || pState.shotCooldown;
+            slider.disabled = !isMyTurn || pState.simulating;
 
-            const timerVal = pState.timerRemaining || 0;
+            const timerVal = Math.ceil(pState.timerRemaining || 0);
+            const totalTimer = pState.settings?.turnTimer || 30;
             const timerText = document.getElementById('timer-text');
             const timerBar = document.getElementById('timer-bar');
             timerText.innerText = timerVal > 0 ? `${timerVal}s` : "";
-            timerBar.style.width = pState.simulating ? '0%' : `${(timerVal / 30) * 100}%`;
+            timerBar.style.width = pState.simulating ? '0%' : `${(timerVal / totalTimer) * 100}%`;
             timerBar.style.backgroundColor = timerVal < 10 ? 'var(--tournament-red)' : '#22c55e';
 
             for (let idx = 0; idx < 4; idx++) {
@@ -1738,9 +1844,21 @@
                 if (card) card.style.display = 'none';
             }
 
+            // Update player HUD cards and build Leaderboard Data
+            const lbData = [];
+            const playersList = Array.isArray(pState.players) ? pState.players : Object.keys(pState.playerColors);
             pState.turnOrder.forEach((color, idx) => {
-                const pId = pState.players.find(id => pState.playerColors[id] === color);
-                const score = pState.scores[pId] || 0;
+                const pId = playersList.find(id => pState.playerColors[id] === color) || '';
+                const score = (pState.scores && pId) ? (pState.scores[pId] || 0) : 0;
+
+                lbData.push({
+                    id: pId,
+                    color: color,
+                    score: score,
+                    name: getPlayerName(pId),
+                    avatar: getPlayerAvatar(pId, idx),
+                    idx: idx
+                });
 
                 const card = document.getElementById(`hud-card-${idx}`);
                 if (card) {
@@ -1764,15 +1882,39 @@
                 }
             });
 
+            // Populate Leaderboard list ordered by score
+            lbData.sort((a, b) => b.score - a.score);
+            const lbContainer = document.getElementById('leaderboard-list');
+            const rankBadges = ['🥇', '🥈', '🥉', '4️⃣'];
+            lbContainer.innerHTML = lbData.map((item, index) => {
+                return `
+                    <div class="lb-row ${index === 0 ? 'rank-1' : ''}">
+                        <div class="lb-left">
+                            <span class="rank-badge">${rankBadges[index] || (index+1)}</span>
+                            <div class="hud-avatar-wrapper" style="width: 28px; height: 28px;">
+                                <img class="hud-avatar" src="${item.avatar}">
+                            </div>
+                            <span class="lb-name">${item.name}</span>
+                        </div>
+                        <span class="lb-score">${item.score} PTS</span>
+                    </div>
+                `;
+            }).join('');
+
             if (pState.status === 'finished') {
-                activeHeader.innerText = `WINNER: ${pState.winner.toUpperCase()}!`;
-                playSound('win');
-                if (Arcade.haptics) Arcade.haptics.trigger('success');
+                activeHeader.innerText = `WINNER: ${pState.winner ? pState.winner.toUpperCase() : 'GAME OVER'}!`;
+                if (!winnerModalShown) {
+                    winnerModalShown = true;
+                    playSound('win');
+                    if (Arcade.haptics) Arcade.haptics.trigger('success');
+                    toggleLeaderboardModal();
+                }
             }
         }
 
-        // Draw static board decals once static canvas is ready
+        // Draw static board decals once static canvas is ready and trigger dynamic sizing
         drawStaticBoard();
+        resizeGame();
 
         // Start animating visual loop
         requestAnimationFrame(animate);
